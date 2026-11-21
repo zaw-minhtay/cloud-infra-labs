@@ -1,0 +1,25 @@
+# Scan every push and pull request for leaked secrets (keys, passwords, tokens).
+# If a secret is found, this check fails and the push is flagged in red.
+name: gitleaks
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch: # lets you run it by hand from the Actions tab
+
+permissions:
+  contents: read
+  pull-requests: write # lets gitleaks comment on a PR where it finds a secret
+
+jobs:
+  scan:
+    name: gitleaks
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0 # full history, so old commits are scanned too
+      - uses: gitleaks/gitleaks-action@v3
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # No GITLEAKS_LICENSE needed: this repo belongs to a personal account.
