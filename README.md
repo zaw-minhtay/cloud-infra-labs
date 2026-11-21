@@ -3,8 +3,6 @@
 Hands-on labs, system architecture designs, and how-to notes from my work as a cloud and
 infrastructure engineer. Everything here was built and run by me on real cloud accounts.
 
-**Portfolio:** [zawminhtay.com](https://zawminhtay.com)
-
 ## Architectures
 
 System designs: diagram, decisions, trade-offs, and cost.
