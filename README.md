@@ -5,17 +5,21 @@ infrastructure engineer. Everything here was built and run by me on real cloud a
 
 **Portfolio:** [zawminhtay.com](https://zawminhtay.com)
 
-## Labs
+## Architectures
 
-| # | Lab | What it covers | Tools |
+System designs: diagram, decisions, trade-offs, and cost.
+
+| # | Architecture | What it covers | Related lab |
 |---|---|---|---|
 | | *Coming soon* | | |
 
-## Architectures
+## Labs
 
-| # | Architecture | What it covers |
-|---|---|---|
-| | *Coming soon* | |
+Hands-on builds, grouped by the main skill they practise.
+
+| Category | # | Lab | What it covers | Tools |
+|---|---|---|---|---|
+| | | *Coming soon* | | |
 
 ## Notes
 
@@ -24,32 +28,52 @@ infrastructure engineer. Everything here was built and run by me on real cloud a
 ## Repository layout
 
 ```
-labs/            hands-on labs, numbered in the order I built them
-architectures/   system designs: diagram + decisions + trade-offs
-notes/           short how-to guides
-templates/       starting point for every new lab or architecture
+architectures/       system designs: diagram + decisions + trade-offs
+labs/
+├── aws/             AWS services (VPC, IAM, S3, EC2…)
+├── terraform/       infrastructure as code
+├── docker/          containers
+├── kubernetes/      EKS, Kubernetes
+├── ci-cd/           GitHub Actions, Argo CD, pipelines
+└── linux/           Linux, networking, shell
+notes/               short how-to guides
+templates/           starting point for every new lab or architecture
+new.sh               creates a new lab or architecture from the templates
 ```
+
+A category folder is created when its first lab is added.
+
+## Starting something new
+
+Every topic can have **an architecture** (the design: *why*) and **a lab** (the build: *how*),
+linked to each other.
+
+```bash
+./new.sh arch gitops-cicd-pipeline            # → architectures/01-gitops-cicd-pipeline/
+./new.sh lab ci-cd gitops-argocd-pipeline     # → labs/ci-cd/01-gitops-argocd-pipeline/
+```
+
+The script picks the next number and copies the template. Then:
+
+1. Fill in every section of the new `README.md`, including cost and cleanup.
+2. Add `diagram.png` next to it.
+3. Link the architecture and lab to each other (the templates have a line for this).
+4. Add a row to the tables above.
 
 ## Naming rules
 
 | What | Rule | Example |
 |---|---|---|
-| Lab folder | `labs/NN-what-you-build` — next number, lowercase, hyphens | `labs/01-eks-cluster` |
-| Architecture folder | `architectures/NN-system-name` | `architectures/01-three-tier-web-app` |
+| Lab category | The **main skill** the lab practises; other tools go in the Tools column | `ci-cd` |
+| Lab folder | `labs/<category>/NN-what-you-build` — numbers restart per category | `labs/ci-cd/01-gitops-argocd-pipeline` |
+| Architecture folder | `architectures/NN-system-name` | `architectures/01-gitops-cicd-pipeline` |
 | Note folder | `notes/topic-name` | `notes/ssh-agent-forwarding` |
-| Lab title (first line of README) | `# Lab NN — Title` | `# Lab 01 — EKS Cluster with Terraform` |
+| Lab title | `# Lab NN — Title` | `# Lab 01 — GitOps Pipeline with Argo CD` |
+| Architecture title | `# Architecture NN — Title` | `# Architecture 01 — GitOps CI/CD Pipeline` |
 | Terraform files | `main.tf`, `variables.tf`, `outputs.tf`, `versions.tf` | |
 | Diagram | `diagram.png` next to the README | |
 
-## Adding a new lab
-
-1. Create `labs/NN-what-you-build/` using the next number.
-2. Copy [templates/LAB_TEMPLATE.md](templates/LAB_TEMPLATE.md) into it as `README.md`.
-3. Fill in every section, including cost and cleanup.
-4. Add a row to the **Labs** table above.
-
-New architectures work the same way with
-[templates/ARCHITECTURE_TEMPLATE.md](templates/ARCHITECTURE_TEMPLATE.md).
+Names use lowercase letters, numbers, and hyphens only.
 
 > Labs create real cloud resources that can cost money. Always run the cleanup steps
 > (for Terraform: `terraform destroy`) when you finish.

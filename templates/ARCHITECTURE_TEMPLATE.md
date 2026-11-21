@@ -1,6 +1,8 @@
-# Architecture title
+# Architecture NN — Title
 
 > One sentence: what system this is and who it is for.
+
+**Related lab:** [Lab NN — Title](../../labs/CATEGORY/NN-what-you-build/README.md) *(delete this line if there is none)*
 
 ## Requirements
 
@@ -13,7 +15,7 @@
 
 ## Components
 
-| Component | Service | Why this one |
+| Component | Service / tool | Why this one |
 |---|---|---|
 | | | |
 

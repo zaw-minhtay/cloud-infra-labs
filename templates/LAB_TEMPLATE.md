@@ -2,6 +2,9 @@
 
 > One sentence: what you build and why it matters.
 
+**Category:** CATEGORY
+**Related architecture:** [Architecture NN — Title](../../../architectures/NN-system-name/README.md) *(delete this line if there is none)*
+
 ## Goal
 
 What problem does this lab solve? What should work at the end?
@@ -14,7 +17,9 @@ Explain the diagram in 3–5 bullet points: what each component does and how tra
 
 ## Tools and services
 
-- Service / tool — what it is used for
+| Tool / service | Used for |
+|---|---|
+| | |
 
 ## Prerequisites
 
