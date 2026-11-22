@@ -7,7 +7,7 @@ Uses only the Python standard library, so there is nothing to install.
 import os
 from http.server import BaseHTTPRequestHandler, HTTPServer
 
-MESSAGE = "Hello from GitOps!"
+MESSAGE = "Hello from GitOps v2!"
 VERSION = os.environ.get("APP_VERSION", "dev")
 
 
