@@ -8,5 +8,5 @@ resources:
   - service.yaml
 images:
   - name: gitops-demo
-    newName: ghcr.io/your-github-username/gitops-demo
-    newTag: not-built-yet
+    newName: ghcr.io/zaw-minhtay/gitops-demo
+    newTag: 1030a7c
