@@ -1,0 +1,4 @@
+# Only server.py goes into the image.
+test_*.py
+__pycache__/
+*.pyc

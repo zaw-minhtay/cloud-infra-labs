@@ -1,0 +1,7 @@
+# kind cluster for Lab 01: one node that runs both the control plane and the workloads.
+# Uses the default Kubernetes node image of the installed kind version (kind 0.33.0 when written).
+kind: Cluster
+apiVersion: kind.x-k8s.io/v1alpha4
+name: gitops-lab
+nodes:
+  - role: control-plane

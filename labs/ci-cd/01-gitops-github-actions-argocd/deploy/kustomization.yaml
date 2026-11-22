@@ -1,0 +1,12 @@
+# Desired state of the demo app. Argo CD applies this folder to the cluster.
+# CI updates only the `images` block below (newName and newTag) after each build.
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+namespace: demo
+resources:
+  - deployment.yaml
+  - service.yaml
+images:
+  - name: gitops-demo
+    newName: ghcr.io/your-github-username/gitops-demo
+    newTag: not-built-yet

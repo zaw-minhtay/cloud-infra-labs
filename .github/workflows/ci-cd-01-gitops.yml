@@ -1,0 +1,80 @@
+# CI for Lab 01 (labs/ci-cd/01-gitops-github-actions-argocd).
+# Tests the app, builds a multi-arch image, pushes it to GHCR, and commits the new tag to deploy/.
+# It never talks to the cluster: Argo CD pulls the change from Git.
+name: ci-cd-01-gitops
+
+on:
+  push:
+    branches: [main]
+    paths:
+      # Only app changes trigger a build. Changes to deploy/ (the tag commit below, or a
+      # rollback with git revert) must NOT trigger CI.
+      - "labs/ci-cd/01-gitops-github-actions-argocd/app/**"
+      - ".github/workflows/ci-cd-01-gitops.yml"
+  workflow_dispatch: # lets you run it by hand: gh workflow run ci-cd-01-gitops.yml
+
+permissions:
+  contents: write  # commit the new image tag to deploy/
+  packages: write  # push the image to GHCR
+
+concurrency:
+  group: ci-cd-01-gitops
+  cancel-in-progress: false
+
+env:
+  LAB_DIR: labs/ci-cd/01-gitops-github-actions-argocd
+  IMAGE_NAME: gitops-demo
+
+jobs:
+  build-and-release:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Run tests
+        working-directory: ${{ env.LAB_DIR }}
+        run: python3 -m unittest discover -s app -v
+
+      - name: Work out image name and tag
+        id: meta
+        run: |
+          owner="${GITHUB_REPOSITORY_OWNER,,}"   # GHCR names must be lowercase
+          echo "image=ghcr.io/${owner}/${IMAGE_NAME}" >> "$GITHUB_OUTPUT"
+          echo "tag=${GITHUB_SHA::7}" >> "$GITHUB_OUTPUT"
+
+      - uses: docker/setup-qemu-action@v4      # emulates arm64 on the amd64 runner
+      - uses: docker/setup-buildx-action@v4
+
+      - uses: docker/login-action@v4
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push the image (arm64 + amd64)
+        uses: docker/build-push-action@v7
+        with:
+          context: ${{ env.LAB_DIR }}/app
+          platforms: linux/amd64,linux/arm64
+          push: true
+          build-args: APP_VERSION=${{ steps.meta.outputs.tag }}
+          tags: ${{ steps.meta.outputs.image }}:${{ steps.meta.outputs.tag }}
+          labels: org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}
+
+      - name: Commit the new image tag to deploy/
+        working-directory: ${{ env.LAB_DIR }}
+        env:
+          IMAGE: ${{ steps.meta.outputs.image }}
+          TAG: ${{ steps.meta.outputs.tag }}
+        run: |
+          sed -i "s|newName: .*|newName: ${IMAGE}|; s|newTag: .*|newTag: ${TAG}|" deploy/kustomization.yaml
+          if git diff --quiet; then
+            echo "Tag already ${TAG}; nothing to commit."
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add deploy/kustomization.yaml
+          git commit -m "chore(ci-cd): deploy ${IMAGE_NAME} ${TAG}"
+          git pull --rebase
+          git push

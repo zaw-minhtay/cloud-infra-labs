@@ -1,0 +1,55 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: demo
+  labels:
+    app: demo
+spec:
+  replicas: 2
+  revisionHistoryLimit: 3
+  selector:
+    matchLabels:
+      app: demo
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 0   # keep both old pods serving until a new pod is ready
+      maxSurge: 1
+  template:
+    metadata:
+      labels:
+        app: demo
+    spec:
+      imagePullSecrets:
+        - name: ghcr-pull   # created by hand in step 13 (read-only GHCR token)
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 10001
+      containers:
+        - name: demo
+          image: gitops-demo   # replaced by Kustomize with the GHCR image and tag
+          ports:
+            - name: http
+              containerPort: 8080
+          readinessProbe:      # a broken release never receives traffic
+            httpGet:
+              path: /healthz
+              port: http
+            periodSeconds: 5
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          resources:
+            requests:
+              cpu: 50m
+              memory: 32Mi
+            limits:
+              memory: 64Mi
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: ["ALL"]
