@@ -16,6 +16,10 @@ id_rsa*
 .vscode/
 .idea/
 
+# Python
+__pycache__/
+*.pyc
+
 # draw.io backups
 *.drawio.bkp
 .$*.bkp
