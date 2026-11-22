@@ -9,4 +9,4 @@ resources:
 images:
   - name: gitops-demo
     newName: ghcr.io/zaw-minhtay/gitops-demo
-    newTag: 1030a7c
+    newTag: c9776f7
