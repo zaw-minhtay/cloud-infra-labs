@@ -15,3 +15,7 @@ id_rsa*
 .DS_Store
 .vscode/
 .idea/
+
+# draw.io backups
+*.drawio.bkp
+.$*.bkp

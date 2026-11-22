@@ -9,7 +9,7 @@ order, `NN-system-name`, and starts from
 
 ```
 architectures/
-└── 01-gitops-cicd-pipeline/
+└── 01-gitops-github-actions-argocd/
     ├── README.md
     └── diagram.png
 ```

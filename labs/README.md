@@ -19,7 +19,7 @@ per category, `NN-what-you-build`, and starts from
 ```
 labs/
 └── ci-cd/
-    └── 01-gitops-argocd-pipeline/
+    └── 01-gitops-github-actions-argocd/
         ├── README.md
         └── diagram.png
 ```

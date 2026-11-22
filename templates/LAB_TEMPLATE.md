@@ -1,61 +1,70 @@
 # Lab NN — Title
 
-> One sentence: what you build and why it matters.
+> One or two sentences: what you build and why it matters.
 
 **Category:** CATEGORY
 **Related architecture:** [Architecture NN — Title](../../../architectures/NN-system-name/README.md) *(delete this line if there is none)*
 
+**▶ To run this lab, follow the [step-by-step guide (SETUP.md)](SETUP.md).**
+
 ## Goal
 
-What problem does this lab solve? What should work at the end?
+What problem does this lab solve (why not the simple/manual way)?
+
+At the end of the lab:
+
+- What works, stated so it can be checked
+- ...
 
 ## Architecture
 
-![Architecture diagram](./diagram.png)
+![Architecture diagram](../../../architectures/NN-system-name/diagram.png)
 
-Explain the diagram in 3–5 bullet points: what each component does and how traffic or data flows.
+- **Component:** what it does in this lab and how data flows (3–6 bullets)
+
+Design details, decisions, and trade-offs are in the
+[architecture](../../../architectures/NN-system-name/README.md).
+
+## What you'll practise
+
+| Skill | Where in the guide |
+|---|---|
+| | Step numbers in SETUP.md |
 
 ## Tools and services
 
-| Tool / service | Used for |
-|---|---|
-| | |
+| Tool / service | Used for | Version |
+|---|---|---|
+| | | Pin every version you can |
 
-## Prerequisites
+Install sources and setup: [SETUP.md, Part 1](SETUP.md#part-1--prepare-your-environment).
 
-- Accounts, CLIs, and permissions needed
+## Files in this lab
 
-## Steps
-
-1. Step with the exact command or console action
-   ```bash
-   # command
-   ```
-2. ...
-
-## Verify it works
-
-How to prove it works: a command to run, a URL to open, expected output.
-Add a screenshot if it helps.
+```
+labs/CATEGORY/NN-what-you-build/
+├── README.md     this overview
+├── SETUP.md      step-by-step guide
+└── ...
+```
 
 ## Problems I hit and how I fixed them
 
+> Filled in while building the lab. Never invent entries.
+
 | Problem | Cause | Fix |
 |---|---|---|
-| | | |
 
-## Cost and cleanup
+## Cost
 
-- Estimated cost while running:
-- How to delete everything:
-  ```bash
-  terraform destroy
-  ```
+Estimated cost while running, and the biggest cost drivers (or why it is $0). To remove
+everything afterwards, see [SETUP.md, Part 4 — Clean up](SETUP.md#part-4--clean-up).
 
 ## What I'd do differently
 
-What would you change for production? (security, high availability, automation, monitoring)
+> Written after the lab is finished. What would change for production (security, high
+> availability, automation, monitoring)?
 
 ## References
 
-- Links to docs you used
+- Official documentation used

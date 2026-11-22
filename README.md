@@ -47,8 +47,8 @@ Every topic can have **an architecture** (the design: *why*) and **a lab** (the 
 linked to each other.
 
 ```bash
-./new.sh arch gitops-cicd-pipeline            # → architectures/01-gitops-cicd-pipeline/
-./new.sh lab ci-cd gitops-argocd-pipeline     # → labs/ci-cd/01-gitops-argocd-pipeline/
+./new.sh arch gitops-github-actions-argocd        # → architectures/01-gitops-github-actions-argocd/
+./new.sh lab ci-cd gitops-github-actions-argocd   # → labs/ci-cd/01-gitops-github-actions-argocd/
 ```
 
 The script picks the next number and copies the template. Then:
@@ -63,13 +63,13 @@ The script picks the next number and copies the template. Then:
 | What | Rule | Example |
 |---|---|---|
 | Lab category | The **main skill** the lab practises; other tools go in the Tools column | `ci-cd` |
-| Lab folder | `labs/<category>/NN-what-you-build` — numbers restart per category | `labs/ci-cd/01-gitops-argocd-pipeline` |
-| Architecture folder | `architectures/NN-system-name` | `architectures/01-gitops-cicd-pipeline` |
+| Lab folder | `labs/<category>/NN-what-you-build` — numbers restart per category | `labs/ci-cd/01-gitops-github-actions-argocd` |
+| Architecture folder | `architectures/NN-system-name` | `architectures/01-gitops-github-actions-argocd` |
 | Note folder | `notes/topic-name` | `notes/ssh-agent-forwarding` |
-| Lab title | `# Lab NN — Title` | `# Lab 01 — GitOps Pipeline with Argo CD` |
-| Architecture title | `# Architecture NN — Title` | `# Architecture 01 — GitOps CI/CD Pipeline` |
+| Lab title | `# Lab NN — Title` | `# Lab 01 — GitOps Pipeline with GitHub Actions and Argo CD on Local Kubernetes` |
+| Architecture title | `# Architecture NN — Title` | `# Architecture 01 — GitOps Pipeline with GitHub Actions and Argo CD on Local Kubernetes` |
 | Terraform files | `main.tf`, `variables.tf`, `outputs.tf`, `versions.tf` | |
-| Diagram | `diagram.png` next to the README | |
+| Diagram | `diagram.drawio` (source, edit in draw.io) + `diagram.png` (export) next to the README | |
 
 Names use lowercase letters, numbers, and hyphens only.
 

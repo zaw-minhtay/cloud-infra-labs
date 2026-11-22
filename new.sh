@@ -2,8 +2,8 @@
 # Create a new lab or architecture from the templates, with the next number.
 #
 # Usage:
-#   ./new.sh lab  <category> <name>    e.g. ./new.sh lab ci-cd gitops-argocd-pipeline
-#   ./new.sh arch <name>               e.g. ./new.sh arch gitops-cicd-pipeline
+#   ./new.sh lab  <category> <name>    e.g. ./new.sh lab ci-cd gitops-github-actions-argocd
+#   ./new.sh arch <name>               e.g. ./new.sh arch gitops-github-actions-argocd
 #
 # Names: lowercase letters, numbers and hyphens only.
 set -euo pipefail
@@ -19,7 +19,7 @@ usage() {
 
 check_name() {
   [[ "$1" =~ ^[a-z0-9]+(-[a-z0-9]+)*$ ]] || {
-    echo "Error: '$1' must be lowercase letters, numbers and hyphens (e.g. gitops-argocd-pipeline)."
+    echo "Error: '$1' must be lowercase letters, numbers and hyphens (e.g. gitops-github-actions-argocd)."
     exit 1
   }
 }
@@ -47,8 +47,10 @@ case "$kind" in
     num=$(next_number "$parent")
     dir="$parent/$num-$name"
     mkdir "$dir"
-    sed -e "1s/NN/$num/" -e "s/^\*\*Category:\*\* CATEGORY/**Category:** $category/" \
-      templates/LAB_TEMPLATE.md > "$dir/README.md"
+    for f in README:LAB_TEMPLATE SETUP:SETUP_TEMPLATE; do
+      sed -e "1s/NN/$num/" -e "s/CATEGORY/$category/g" -e "s/NN-what-you-build/$num-$name/g" \
+        "templates/${f#*:}.md" > "$dir/${f%%:*}.md"
+    done
     ;;
   arch)
     [ $# -eq 2 ] || usage
@@ -65,5 +67,5 @@ case "$kind" in
     ;;
 esac
 
-echo "Created $dir/README.md"
-echo "Next: fill in the README, add diagram.png, and add a row to the table in README.md."
+echo "Created $dir/README.md$([ "$kind" = lab ] && echo " and $dir/SETUP.md")"
+echo "Next: fill in every section (see CLAUDE.md §3), add diagram.drawio + diagram.png, and add a row to the table in README.md."
