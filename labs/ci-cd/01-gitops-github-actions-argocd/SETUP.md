@@ -244,17 +244,19 @@ this lab's `app/`, it:
 Changes to `deploy/` do **not** trigger CI, so the tag commit and Git rollbacks (step 20)
 never cause a rebuild.
 
-Nothing in `app/` has changed yet, so run the workflow once by hand, then watch it:
+Nothing in `app/` has changed yet, so run the workflow once by hand on GitHub:
 
-```bash
-gh workflow run ci-cd-01-gitops.yml --repo <your-github-username>/cloud-infra-labs
-gh run watch --repo <your-github-username>/cloud-infra-labs
-```
+1. Open `https://github.com/<your-github-username>/cloud-infra-labs` and click the
+   **Actions** tab.
+2. In the left sidebar, click **ci-cd-01-gitops**.
+3. On the right, click **Run workflow**, keep **Branch: main**, and click the green
+   **Run workflow** button. (This button exists because the workflow has
+   `workflow_dispatch:`.)
+4. After a few seconds a new run appears at the top of the list (a yellow dot means it is
+   running). Click it, then click the job **build-and-release** to watch each step live.
 
-`gh run watch` asks which run to watch; pick the `ci-cd-01-gitops` run.
-
-Expected: every step shows ✓ and the run ends with `completed` / `success`. Building arm64 on
-GitHub's amd64 runners uses emulation, so this takes a few minutes.
+Expected: every step gets a green ✓ and the run shows **Success**. Building arm64 on GitHub's
+amd64 runners uses emulation, so this takes a few minutes.
 
 Pull the commit CI made and check the new tag:
 
@@ -388,10 +390,9 @@ Change the app's message, push, and watch the change flow through to the cluster
    git commit -m "feat(ci-cd): change demo message"
    git push
    ```
-3. Watch CI build the new image and commit the new tag (pick the newest run):
-   ```bash
-   gh run watch --repo <your-github-username>/cloud-infra-labs
-   ```
+3. Watch CI build the new image and commit the new tag: on GitHub, open the **Actions** tab
+   → **ci-cd-01-gitops** → the newest run (started by your push) → **build-and-release**.
+   Wait until every step has a green ✓.
 4. Argo CD checks Git every 3 minutes. To check right away, and watch the pods roll:
    ```bash
    argocd app get demo --refresh
