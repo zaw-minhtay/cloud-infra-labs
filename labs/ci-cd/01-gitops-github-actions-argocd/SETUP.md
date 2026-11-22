@@ -332,6 +332,27 @@ After `read -s GHCR_TOKEN`, paste the token and press **Enter** (nothing is show
 
 Expected: `namespace/demo created`, then `secret/ghcr-pull created`.
 
+<details>
+<summary><b>Only if your copy of the repo is private:</b> give Argo CD a read-only deploy key</summary>
+
+A fork of a public repo is always public, so most readers skip this. If you copied the repo
+into a **private** repo instead (for example with **Import repository**), Argo CD needs a key
+to read it:
+
+```bash
+ssh-keygen -t ed25519 -C argocd-gitops-lab -f ~/.ssh/argocd-gitops-lab -N ""
+gh repo deploy-key add ~/.ssh/argocd-gitops-lab.pub --repo <your-github-username>/cloud-infra-labs --title argocd-gitops-lab
+argocd repo add git@github.com:<your-github-username>/cloud-infra-labs.git --ssh-private-key-path ~/.ssh/argocd-gitops-lab
+```
+
+The key has no passphrase because Argo CD must use it unattended. GitHub deploy keys are
+read-only unless you add `--allow-write`, which you must not.
+
+Expected: `Repository 'git@github.com:…' added`. In step 14, use the SSH command for private
+repos.
+
+</details>
+
 ### 14. Create the Argo CD Application
 
 File: [argocd/application.yaml](argocd/application.yaml). It points Argo CD at this lab's
@@ -344,6 +365,18 @@ Apply it with your username filled in (the file in Git keeps the placeholder):
 GH_USER=$(gh api user --jq .login)
 sed "s/your-github-username/${GH_USER}/" argocd/application.yaml | kubectl apply -f -
 ```
+
+<details>
+<summary><b>Only if your copy of the repo is private:</b> use the SSH URL instead</summary>
+
+Use this instead of the command above, so Argo CD connects with the deploy key from step 13:
+
+```bash
+GH_USER=$(gh api user --jq .login)
+sed "s#https://github.com/your-github-username/#git@github.com:${GH_USER}/#" argocd/application.yaml | kubectl apply -f -
+```
+
+</details>
 
 Wait for the first sync:
 
@@ -483,6 +516,20 @@ The `read:packages` token from step 13 is no longer needed.
 
 Expected: the token is no longer in the list.
 
+<details>
+<summary><b>Only if you added a deploy key in step 13:</b> delete it</summary>
+
+```bash
+gh repo deploy-key list --repo <your-github-username>/cloud-infra-labs
+gh repo deploy-key delete <key-id> --repo <your-github-username>/cloud-infra-labs
+rm ~/.ssh/argocd-gitops-lab ~/.ssh/argocd-gitops-lab.pub
+```
+
+Expected: `gh repo deploy-key list` no longer shows `argocd-gitops-lab`, and
+`ls ~/.ssh/argocd-gitops-lab*` says `No such file or directory`.
+
+</details>
+
 ### 23. Delete the container image (optional)
 
 1. On GitHub, open your profile → **Packages** → the lab's image.
@@ -514,4 +561,4 @@ To remove Docker Desktop: open it → **Troubleshoot** (bug icon) → **Uninstal
 | CI step **Commit the new image tag** fails on `git push` | Branch protection on `main` blocks the bot | Allow GitHub Actions to push to `main`, or remove the rule for this lab |
 | Pods stuck in `ImagePullBackOff` | Wrong or expired token in `ghcr-pull` | `kubectl describe pod -n demo <pod>` shows the error; recreate the secret (step 13a) |
 | Pods fail with `exec format error` | Image built for the wrong CPU (amd64 only) | Check the workflow's `platforms:` includes `linux/arm64` |
-| `argocd app get demo` shows `ComparisonError` / `repository not found` | Wrong username in `repoURL`, or the repo is private | `kubectl get application demo -n argocd -o jsonpath='{.spec.source.repoURL}'` to check the URL; make sure the repo is public |
+| `argocd app get demo` shows `ComparisonError` / `repository not found` | Wrong username in `repoURL`, or the repo is private | `kubectl get application demo -n argocd -o jsonpath='{.spec.source.repoURL}'` to check the URL. For a private repo, add the deploy key and use the SSH URL (the private-repo sections in steps 13 and 14) |
