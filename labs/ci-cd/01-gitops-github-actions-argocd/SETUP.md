@@ -313,22 +313,35 @@ your public repo over HTTPS.
    (classic)** → **Generate new token (classic)**. GHCR only accepts classic tokens.
 2. Note: `gitops-lab GHCR pull`. Expiration: **7 days**. Scopes: tick **only**
    `read:packages`.
-3. Click **Generate token** and copy it.
+3. Click **Generate token** and copy it. Paste it **only** into the terminal prompt below,
+   never into an editor, chat, or file.
 
-Store it in the cluster as the `ghcr-pull` secret. `read -s` keeps the token out of your
-screen and shell history:
+**a. Enter the token and test it.** `read -s` keeps the token off your screen and out of
+your shell history. The test pull proves the token works *before* the cluster depends on it:
+
+```bash
+read -s "?Paste your GHCR token, then press Enter: " GHCR_TOKEN
+echo; echo "Token length: ${#GHCR_TOKEN}"
+echo "$GHCR_TOKEN" | docker login ghcr.io -u <your-github-username> --password-stdin
+docker pull ghcr.io/<your-github-username>/gitops-demo:$(grep newTag deploy/kustomization.yaml | awk '{print $2}')
+```
+
+Expected: `Token length: 40`, then `Login Succeeded`, then the image downloads. If the length
+is not 40, or the login fails, run the block again and paste the token once. If it still
+fails, the token is missing the `read:packages` scope or is not a **classic** token: create a
+new one.
+
+**b. Store it in the cluster** as the `ghcr-pull` secret (same terminal, so `GHCR_TOKEN` is
+still set):
 
 ```bash
 kubectl create namespace demo
-read -s GHCR_TOKEN
 kubectl create secret docker-registry ghcr-pull -n demo \
   --docker-server=ghcr.io \
   --docker-username=<your-github-username> \
   --docker-password="$GHCR_TOKEN"
 unset GHCR_TOKEN
 ```
-
-After `read -s GHCR_TOKEN`, paste the token and press **Enter** (nothing is shown).
 
 Expected: `namespace/demo created`, then `secret/ghcr-pull created`.
 
@@ -476,14 +489,23 @@ minute. Press `Ctrl+C` to stop watching.
 
 ### 20. Check rollback with Git
 
-Find the last commit that changed the image tag, revert it, and push:
+Revert the **newest** commit that changed the image tag (the one CI made in step 15), and
+push:
 
 ```bash
 git pull
-git log --oneline -- deploy/
-git revert <commit-from-the-top-line>
+git log --oneline -3 -- deploy/
+git revert --no-edit $(git log -1 --format=%h -- deploy/)
 git push
 ```
+
+`git log -1 … -- deploy/` picks the newest tag commit for you (the top line of the list
+shown above it). `--no-edit` keeps the default "Revert …" message instead of opening an
+editor.
+
+> Revert only the **newest** tag commit. Reverting an older one gives a `CONFLICT`, because
+> a newer commit has changed the same line since. If that happens, run `git revert --abort`
+> and use the command above.
 
 Expected: within a few minutes Argo CD syncs the previous tag (`argocd app get demo`), and
 `curl http://localhost:8080` shows the previous version. CI does not run, because it ignores
@@ -513,8 +535,12 @@ The `read:packages` token from step 13 is no longer needed.
 
 1. On GitHub, open **Settings → Developer settings → Personal access tokens → Tokens (classic)**.
 2. Find the token you created for this lab and click **Delete**.
+3. Remove the token Docker saved on your Mac during the test login in step 13a:
+   ```bash
+   docker logout ghcr.io
+   ```
 
-Expected: the token is no longer in the list.
+Expected: the token is no longer in the list, and Docker prints `Removing login credentials for ghcr.io`.
 
 <details>
 <summary><b>Only if you added a deploy key in step 13:</b> delete it</summary>
@@ -559,6 +585,40 @@ To remove Docker Desktop: open it → **Troubleshoot** (bug icon) → **Uninstal
 | `docker run` fails with `port is already allocated` | Something already uses port 8080 (often a `kubectl port-forward`) | Stop it with `Ctrl+C`, or use another port: `-p 8081:8080` |
 | CI step **Build and push** fails with `denied` | A `gitops-demo` package already exists and isn't linked to this repo | On GitHub, open the package → **Package settings → Manage Actions access** → add your repo with **Write** |
 | CI step **Commit the new image tag** fails on `git push` | Branch protection on `main` blocks the bot | Allow GitHub Actions to push to `main`, or remove the rule for this lab |
-| Pods stuck in `ImagePullBackOff` | Wrong or expired token in `ghcr-pull` | `kubectl describe pod -n demo <pod>` shows the error; recreate the secret (step 13a) |
+| Pods stuck in `ImagePullBackOff` | Kubernetes can't download the image, usually a mis-pasted or wrong token in `ghcr-pull` | Follow [Fixing ImagePullBackOff](#fixing-imagepullbackoff) below |
 | Pods fail with `exec format error` | Image built for the wrong CPU (amd64 only) | Check the workflow's `platforms:` includes `linux/arm64` |
 | `argocd app get demo` shows `ComparisonError` / `repository not found` | Wrong username in `repoURL`, or the repo is private | `kubectl get application demo -n argocd -o jsonpath='{.spec.source.repoURL}'` to check the URL. For a private repo, add the deploy key and use the SSH URL (the private-repo sections in steps 13 and 14) |
+
+### Fixing ImagePullBackOff
+
+`kubectl get pods -n demo` shows `ImagePullBackOff`: the pods exist (Argo CD synced), but
+Kubernetes can't download the image from GHCR.
+
+1. **Read the exact error:**
+   ```bash
+   kubectl describe pod -n demo -l app=demo | grep -A12 "^Events"
+   ```
+   `401 Unauthorized` or `denied` → the token (go to 3). `not found` → the image or tag (go to 2).
+2. **Check which image the pod pulls, and the username in the secret:**
+   ```bash
+   kubectl get deployment demo -n demo -o jsonpath='{.spec.template.spec.containers[0].image}'; echo
+   kubectl get secret ghcr-pull -n demo -o jsonpath='{.data.\.dockerconfigjson}' | base64 -d | grep -o '"username":"[^"]*"'
+   ```
+   Expected: `ghcr.io/<your-github-username>/gitops-demo:<tag>` and your username. The tag
+   must match a version under your profile → **Packages** → `gitops-demo`.
+3. **Replace the token:** run step 13a again (it tests the token), then:
+   ```bash
+   kubectl delete secret ghcr-pull -n demo
+   kubectl create secret docker-registry ghcr-pull -n demo \
+     --docker-server=ghcr.io \
+     --docker-username=<your-github-username> \
+     --docker-password="$GHCR_TOKEN"
+   unset GHCR_TOKEN
+   ```
+4. **Make the pods retry now** (the Deployment recreates them; Argo CD does not count this as
+   drift):
+   ```bash
+   kubectl delete pod -n demo -l app=demo
+   kubectl get pods -n demo --watch
+   ```
+   Expected: 2 new pods reach `Running` and `1/1`. Press `Ctrl+C` to stop watching.
