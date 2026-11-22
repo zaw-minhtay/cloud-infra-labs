@@ -489,27 +489,70 @@ minute. Press `Ctrl+C` to stop watching.
 
 ### 20. Check rollback with Git
 
-Revert the **newest** commit that changed the image tag (the one CI made in step 15), and
-push:
+Roll back by undoing the **newest** deployment: the tag commit CI made in step 15.
 
-```bash
-git pull
-git log --oneline -3 -- deploy/
-git revert --no-edit $(git log -1 --format=%h -- deploy/)
-git push
-```
+1. List the latest tag commits (only CI's tag commits change `deploy/`):
+   ```bash
+   git pull
+   git log --oneline -3 -- deploy/
+   ```
+   Expected, newest first (your IDs will differ):
+   ```
+   3996ce4 chore(ci-cd): deploy gitops-demo 140949d
+   6e38132 chore(ci-cd): deploy gitops-demo c9776f7
+   d3a9fe2 chore(ci-cd): deploy gitops-demo 1030a7c
+   ```
+   Each line has **two different IDs**:
 
-`git log -1 … -- deploy/` picks the newest tag commit for you (the top line of the list
-shown above it). `--no-edit` keeps the default "Revert …" message instead of opening an
-editor.
+   | Part of the line | Example (top line) | What it is |
+   |---|---|---|
+   | First ID | `3996ce4` | The **commit**: CI's change to `deploy/kustomization.yaml` |
+   | Last ID | `140949d` | The **app version** (image tag) that commit deployed |
 
-> Revert only the **newest** tag commit. Reverting an older one gives a `CONFLICT`, because
-> a newer commit has changed the same line since. If that happens, run `git revert --abort`
-> and use the command above.
+   So the app version running now is the last ID of the **top** line (`140949d`), and the
+   previous app version is the last ID of the second line (`c9776f7`).
+2. Revert the **commit** on the top line (its first ID), and push.
 
-Expected: within a few minutes Argo CD syncs the previous tag (`argocd app get demo`), and
-`curl http://localhost:8080` shows the previous version. CI does not run, because it ignores
-changes to `deploy/` (step 11).
+   `git revert <commit>` means **"undo this change"**, not "go back to this commit". The top
+   commit changed the app from the previous version to the current one, so undoing it brings
+   the previous version back. Only ever revert the top commit.
+
+   ```bash
+   git revert --no-edit <id-from-the-top-line>
+   git push
+   ```
+   For example: `git revert --no-edit 3996ce4`. `git revert` adds a new commit that undoes
+   that one (history is kept); `--no-edit` keeps the default "Revert …" message instead of
+   opening an editor.
+
+   Expected: `1 file changed, 1 insertion(+), 1 deletion(-)` with no conflict, then the push
+   succeeds.
+3. Check the rollback. `argocd app wait` waits until the new pods are rolled out:
+   ```bash
+   argocd app get demo --refresh
+   argocd app wait demo --sync --health --timeout 180
+   kubectl get pods -n demo
+   ```
+   Expected: `Synced` and `Healthy`; 2 new pods `Running 1/1` (the old ones may still show
+   `Terminating` for a few seconds).
+4. Check the app. The port-forward from step 15 **stops** during a rollout, because it was
+   connected to one of the old pods. In your third terminal, start it again (leave it running):
+   ```bash
+   kubectl port-forward -n demo svc/demo 8080:80
+   ```
+   Then:
+   ```bash
+   curl http://localhost:8080
+   ```
+   Expected: the previous message and version (the last ID of the second line, e.g.
+   `Hello from GitOps! version=c9776f7`). CI does not run, because it ignores changes to
+   `deploy/` (step 11).
+
+> Revert only the **top line**. Reverting an older tag commit gives a `CONFLICT`, because a
+> newer commit has changed the same line since. If that happens, run `git revert --abort` and
+> revert the top line instead.
+>
+> Tip: `git revert --no-edit $(git log -1 --format=%h -- deploy/)` picks the top line for you.
 
 
 ---
@@ -587,6 +630,7 @@ To remove Docker Desktop: open it → **Troubleshoot** (bug icon) → **Uninstal
 | CI step **Commit the new image tag** fails on `git push` | Branch protection on `main` blocks the bot | Allow GitHub Actions to push to `main`, or remove the rule for this lab |
 | Pods stuck in `ImagePullBackOff` | Kubernetes can't download the image, usually a mis-pasted or wrong token in `ghcr-pull` | Follow [Fixing ImagePullBackOff](#fixing-imagepullbackoff) below |
 | Pods fail with `exec format error` | Image built for the wrong CPU (amd64 only) | Check the workflow's `platforms:` includes `linux/arm64` |
+| `curl http://localhost:8080` fails after a new version or rollback | `kubectl port-forward svc/…` connects to one pod; it stops when that pod is replaced | Press `Ctrl+C` if it is still showing, then start the port-forward again |
 | `argocd app get demo` shows `ComparisonError` / `repository not found` | Wrong username in `repoURL`, or the repo is private | `kubectl get application demo -n argocd -o jsonpath='{.spec.source.repoURL}'` to check the URL. For a private repo, add the deploy key and use the SSH URL (the private-repo sections in steps 13 and 14) |
 
 ### Fixing ImagePullBackOff

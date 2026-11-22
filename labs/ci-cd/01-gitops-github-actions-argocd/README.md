@@ -95,7 +95,8 @@ labs/ci-cd/01-gitops-github-actions-argocd/
 | Problem | Cause | Fix |
 |---|---|---|
 | Pods stuck in `ImagePullBackOff` after the first Argo CD sync | The GHCR token was mis-pasted when creating the `ghcr-pull` secret; the error only appeared later, when the pods tried to pull | Recreated the secret with a correct token. Step 13 now tests the token first (length check, `docker login`, `docker pull`) before the cluster depends on it |
-| `git revert` stopped with `CONFLICT` in `deploy/kustomization.yaml` during the rollback test | I reverted an older tag commit; a newer tag commit had changed the same `newTag` line since | `git revert --abort`, then reverted the newest tag commit. Step 20 now picks it automatically with `git log -1 -- deploy/` |
+| `git revert` stopped with `CONFLICT` in `deploy/kustomization.yaml` during the rollback test | I reverted the commit of the version I wanted to return to. `git revert` means "undo this commit", not "go back to it"; a newer tag commit had changed the same `newTag` line since | `git revert --abort`, then reverted the newest tag commit. Step 20 now shows the list with an example and says to revert only the top line |
+| `curl http://localhost:8080` failed right after the rollback, although Argo CD showed `Synced` and `Healthy` | `kubectl port-forward svc/demo` attaches to a single pod; the rollout replaced that pod, so the tunnel closed | Restarted the port-forward. Step 20 now says to restart it after a rollout |
 
 ## Cost
 
