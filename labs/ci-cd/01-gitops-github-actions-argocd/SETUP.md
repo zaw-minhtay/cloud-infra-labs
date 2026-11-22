@@ -13,7 +13,7 @@ Desktop 29.9.
 | [1. Prepare your Mac](#part-1--prepare-your-mac) | 1–6 | Install the tools and test them (~30 min, once) |
 | [2. Build and deploy](#part-2--build-and-deploy) | 7–15 | Build the app, CI, and Argo CD, then run the full GitOps loop |
 | [3. Verify](#part-3--verify) | 16–20 | Prove each goal: running, in sync, latest version, self-heal, rollback |
-| [4. Clean up](#part-4--clean-up) | 21–25 | Delete the cluster, the token, the deploy key, the image, and the tools |
+| [4. Clean up](#part-4--clean-up) | 21–24 | Delete the cluster, the token, the image, and the tools |
 
 ## What you need
 
@@ -303,10 +303,11 @@ self-signed certificate; never use it against a real server.
 Expected: `'admin:login' logged in successfully`. You can also open `https://localhost:8443`
 in a browser (accept the certificate warning) and log in as `admin`.
 
-### 13. Give the cluster read-only access
+### 13. Give the cluster read-only access to your image
 
-**a. Pull access to GHCR (everyone).** The cluster needs a read-only token to pull your
-image.
+Your image in GHCR is private (packages have their own visibility, separate from the repo),
+so the cluster needs a read-only token to pull it. Argo CD needs no credentials: it reads
+your public repo over HTTPS.
 
 1. On GitHub, open **Settings → Developer settings → Personal access tokens → Tokens
    (classic)** → **Generate new token (classic)**. GHCR only accepts classic tokens.
@@ -331,20 +332,6 @@ After `read -s GHCR_TOKEN`, paste the token and press **Enter** (nothing is show
 
 Expected: `namespace/demo created`, then `secret/ghcr-pull created`.
 
-**b. Read access to your repo (only if your copy is private).** A public fork needs nothing
-here; skip to step 14. For a private repo, give Argo CD a read-only deploy key:
-
-```bash
-ssh-keygen -t ed25519 -C argocd-gitops-lab -f ~/.ssh/argocd-gitops-lab -N ""
-gh repo deploy-key add ~/.ssh/argocd-gitops-lab.pub --repo <your-github-username>/cloud-infra-labs --title argocd-gitops-lab
-argocd repo add git@github.com:<your-github-username>/cloud-infra-labs.git --ssh-private-key-path ~/.ssh/argocd-gitops-lab
-```
-
-The key has no passphrase because Argo CD must use it unattended. GitHub deploy keys are
-read-only unless you add `--allow-write`, which you must not.
-
-Expected: `Repository 'git@github.com:…' added`.
-
 ### 14. Create the Argo CD Application
 
 File: [argocd/application.yaml](argocd/application.yaml). It points Argo CD at this lab's
@@ -356,13 +343,6 @@ Apply it with your username filled in (the file in Git keeps the placeholder):
 ```bash
 GH_USER=$(gh api user --jq .login)
 sed "s/your-github-username/${GH_USER}/" argocd/application.yaml | kubectl apply -f -
-```
-
-If your repo is **private** (step 13b), use the SSH URL instead:
-
-```bash
-GH_USER=$(gh api user --jq .login)
-sed "s#https://github.com/your-github-username/#git@github.com:${GH_USER}/#" argocd/application.yaml | kubectl apply -f -
 ```
 
 Wait for the first sync:
@@ -503,30 +483,14 @@ The `read:packages` token from step 13 is no longer needed.
 
 Expected: the token is no longer in the list.
 
-### 23. Delete the deploy key (only if you added one in step 13)
-
-```bash
-gh repo deploy-key list --repo <your-github-username>/cloud-infra-labs
-gh repo deploy-key delete <key-id> --repo <your-github-username>/cloud-infra-labs
-```
-
-Then delete the key files from your Mac:
-
-```bash
-rm ~/.ssh/argocd-gitops-lab ~/.ssh/argocd-gitops-lab.pub
-```
-
-Expected: `gh repo deploy-key list` no longer shows `argocd-gitops-lab`, and
-`ls ~/.ssh/argocd-gitops-lab*` says `No such file or directory`.
-
-### 24. Delete the container image (optional)
+### 23. Delete the container image (optional)
 
 1. On GitHub, open your profile → **Packages** → the lab's image.
 2. Click **Package settings** → **Delete this package**, and confirm.
 
 Expected: the package is no longer listed under **Packages**.
 
-### 25. Remove the tools (optional)
+### 24. Remove the tools (optional)
 
 Skip any tool you use for other work.
 
@@ -550,4 +514,4 @@ To remove Docker Desktop: open it → **Troubleshoot** (bug icon) → **Uninstal
 | CI step **Commit the new image tag** fails on `git push` | Branch protection on `main` blocks the bot | Allow GitHub Actions to push to `main`, or remove the rule for this lab |
 | Pods stuck in `ImagePullBackOff` | Wrong or expired token in `ghcr-pull` | `kubectl describe pod -n demo <pod>` shows the error; recreate the secret (step 13a) |
 | Pods fail with `exec format error` | Image built for the wrong CPU (amd64 only) | Check the workflow's `platforms:` includes `linux/arm64` |
-| `argocd app get demo` shows `ComparisonError` for the repo | Argo CD can't read a private repo | Add the deploy key (step 13b) and use the SSH URL (step 14) |
+| `argocd app get demo` shows `ComparisonError` / `repository not found` | Wrong username in `repoURL`, or the repo is private | `kubectl get application demo -n argocd -o jsonpath='{.spec.source.repoURL}'` to check the URL; make sure the repo is public |

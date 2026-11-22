@@ -47,7 +47,7 @@ Design details, decisions, and trade-offs are in the
 | Kubernetes manifests with Kustomize, readiness probes | Step 10 |
 | CI with GitHub Actions and GHCR | Step 11 |
 | GitOps with Argo CD: auto-sync, self-heal, prune | Steps 12–14 |
-| Least-privilege access: deploy keys, `imagePullSecret` | Step 13 |
+| Least-privilege access: read-only `imagePullSecret` | Step 13 |
 | Drift recovery and rollback with Git | Steps 19–20 |
 
 ## Tools and services

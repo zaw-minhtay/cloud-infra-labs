@@ -83,8 +83,7 @@ Everything except GitHub runs on one Mac. Step-by-step guide:
 ## Security
 
 - **No CI → cluster access:** GitHub Actions has no kubeconfig; only Argo CD changes the cluster.
-- **Read-only repo access** for Argo CD: none needed for a public repo; a read-only deploy key
-  if the repo is private.
+- **No repo credentials** for Argo CD: it reads the public repo over HTTPS, read-only.
 - **Read-only `imagePullSecret`** for the cluster to pull from GHCR.
 - **Least-privilege CI token:** the workflow's `GITHUB_TOKEN` gets only `contents: write` and `packages: write`.
 - **Secret scanning:** `gitleaks` runs on every push.
