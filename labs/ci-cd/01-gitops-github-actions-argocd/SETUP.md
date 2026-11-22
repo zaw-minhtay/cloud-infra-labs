@@ -225,8 +225,10 @@ Render the manifests the way Argo CD will see them:
 kubectl kustomize deploy/
 ```
 
-Expected: a `Service` and a `Deployment`, both in namespace `demo`. The image is still
-`ghcr.io/your-github-username/gitops-demo:not-built-yet`; CI replaces it in the next step.
+Expected: a `Service` and a `Deployment`, both in namespace `demo`. The image is whatever
+the last CI run in the repo you forked wrote there (for example
+`ghcr.io/zaw-minhtay/gitops-demo:1030a7c`). Your own CI run in the next step replaces it with
+your image.
 
 ### 11. Run the CI workflow
 
