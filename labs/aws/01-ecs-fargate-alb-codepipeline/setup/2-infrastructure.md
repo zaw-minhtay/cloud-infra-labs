@@ -48,7 +48,7 @@ type `yes`.
 Expected:
 - A warning **"Value for undeclared variable"**: normal. The bootstrap only uses a few of the
   values in that file.
-- `Apply complete! Resources: 4 added, 0 changed, 0 destroyed.`
+- `Apply complete! Resources: 5 added, 0 changed, 0 destroyed.`
 - `state_bucket = "awslab01-dev-s3-tfstate-<account-id>-ap-northeast-1"`: the same name as
   `bucket` in `env/dev/backend.hcl`.
 
@@ -74,7 +74,7 @@ the 2 tasks.
 terraform plan -var-file=env/dev/terraform.tfvars -var app_desired_count=0
 ```
 
-Expected: `Plan: 66 to add, 0 to change, 0 to destroy.` Scroll through it: every name follows
+Expected: `Plan: 67 to add, 0 to change, 0 to destroy.` Scroll through it: every name follows
 the naming rule `awslab01-dev-…`.
 
 ## 10. Build the environment
@@ -85,7 +85,7 @@ terraform apply -var-file=env/dev/terraform.tfvars -var app_desired_count=0
 
 Type `yes` when asked. This takes **about 15–20 minutes**; Aurora is the slowest part.
 
-Expected: `Apply complete! Resources: 66 added, 0 changed, 0 destroyed.` and the outputs:
+Expected: `Apply complete! Resources: 67 added, 0 changed, 0 destroyed.` and the outputs:
 
 ```
 app_url                   = "http://awslab01-dev-alb-….ap-northeast-1.elb.amazonaws.com"

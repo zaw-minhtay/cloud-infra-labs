@@ -135,7 +135,7 @@ Numbered to match the arrows in the diagram.
 - **No long-lived credentials:** everything uses IAM roles; the database password lives only
   in Secrets Manager; GitHub access goes through CodeConnections instead of a stored token.
 - **Encryption:** Aurora storage, the artifact bucket, ECR, and the secret are encrypted at
-  rest; the S3 buckets block all public access.
+  rest; the S3 buckets block all public access, and their bucket policies refuse any request that is not HTTPS.
 - **Container hardening:** the app runs as a non-root user.
 - **Secret scanning:** `gitleaks` runs on every push to the repository.
 

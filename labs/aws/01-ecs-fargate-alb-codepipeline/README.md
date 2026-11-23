@@ -89,11 +89,14 @@ labs/aws/01-ecs-fargate-alb-codepipeline/
     ├── <service>_local.tf   names + settings for the same services, s3, iam, codebuild, codepipeline, cloudwatch
     ├── buildspec/
     │   └── buildspec.yml    CodeBuild steps: build, push, write imagedefinitions.json
+    ├── policy/
+    │   ├── iam/             trust policy + one permission policy per role (JSON)
+    │   └── s3/              artifact bucket policy: HTTPS only (JSON)
     ├── env/
     │   ├── dev/  terraform.tfvars, backend.hcl
     │   ├── stg/  terraform.tfvars, backend.hcl
     │   └── prd/  terraform.tfvars, backend.hcl
-    └── bootstrap/           one-time per account: the state bucket (s3.tf + s3_local.tf)
+    └── bootstrap/           one-time per account: the state bucket (s3.tf + s3_local.tf, policy/s3/)
 ```
 
 ## Terraform structure
@@ -109,6 +112,7 @@ change without touching the resource code:
 | `env/<env>/terraform.tfvars` | Only what differs per environment | CIDRs, sizes, branch, protection, retention |
 | `env/<env>/backend.hcl` | Where that environment's state is stored | state bucket and key |
 | `buildspec/` | Files the AWS resources read, kept next to the code that uses them | `buildspec.yml` for the CodeBuild project in `codebuild.tf` |
+| `policy/<service>/*.json` | IAM and S3 policies as plain JSON, with `${...}` placeholders filled in by `templatefile()` in the matching `_local.tf` / `.tf` | `policy/iam/codebuild_policy.json` ← `iam_local.tf` |
 
 ### Why this structure
 

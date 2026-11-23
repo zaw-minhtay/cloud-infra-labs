@@ -14,7 +14,7 @@ terraform destroy -var-file=env/dev/terraform.tfvars
 Terraform lists everything it will delete. Check it, then type `yes`. This takes about
 **10–15 minutes** (Aurora is the slowest).
 
-Expected: `Destroy complete! Resources: 66 destroyed.` In dev, `force_destroy = true`, so the
+Expected: `Destroy complete! Resources: 67 destroyed.` In dev, `force_destroy = true`, so the
 non-empty ECR repository and artifact bucket are deleted too, and Aurora is deleted without a
 final snapshot. The database password secret that RDS created is deleted with the cluster.
 
@@ -29,7 +29,7 @@ cd ..
 ```
 
 Type `yes`. Expected: the **"Value for undeclared variable"** warning again (normal), then
-`Destroy complete! Resources: 4 destroyed.`
+`Destroy complete! Resources: 5 destroyed.`
 
 ## 24. Remove the GitHub access
 
