@@ -22,3 +22,13 @@ resource "aws_s3_bucket_server_side_encryption_configuration" "artifacts" {
     }
   }
 }
+
+# Bucket policy (policy/s3/artifacts_bucket_policy.json): refuse any request that isn't HTTPS.
+resource "aws_s3_bucket_policy" "artifacts" {
+  bucket = aws_s3_bucket.artifacts.id
+  policy = templatefile(local.s3.artifacts.policy_file, {
+    bucket_arn = aws_s3_bucket.artifacts.arn
+  })
+
+  depends_on = [aws_s3_bucket_public_access_block.artifacts]
+}

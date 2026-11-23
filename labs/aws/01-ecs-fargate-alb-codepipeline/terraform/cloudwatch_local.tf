@@ -2,8 +2,14 @@
 
 locals {
   log_groups = {
-    app   = { name = "/ecs/${local.name_prefix}/app" }             # ECS task (container) logs
-    build = { name = "/aws/codebuild/${local.name_prefix}-build" } # CodeBuild logs
+    # ECS task (container) logs
+    app = {
+      name = "/ecs/${local.name_prefix}/app"
+    }
+    # CodeBuild logs
+    build = {
+      name = "/aws/codebuild/${local.name_prefix}-build"
+    }
   }
 
   # A separate local from the log group name on purpose: the alarms refer to the ECS service,

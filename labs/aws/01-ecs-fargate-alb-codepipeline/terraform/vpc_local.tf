@@ -13,9 +13,18 @@ locals {
   # Three tiers, one subnet per AZ in each: public (ALB), app (ECS tasks), db (Aurora).
   # Keys look like "public-1a", "app-1c", "db-1a".
   subnet_tiers = {
-    public = { cidrs = var.public_subnet_cidrs, route_table = "public" }
-    app    = { cidrs = var.app_subnet_cidrs, route_table = "private" }
-    db     = { cidrs = var.db_subnet_cidrs, route_table = "private" }
+    public = {
+      cidrs       = var.public_subnet_cidrs
+      route_table = "public"
+    }
+    app = {
+      cidrs       = var.app_subnet_cidrs
+      route_table = "private"
+    }
+    db = {
+      cidrs       = var.db_subnet_cidrs
+      route_table = "private"
+    }
   }
 
   subnets = merge([
@@ -31,8 +40,16 @@ locals {
   ]...)
 
   route_tables = {
-    public  = { name = "${local.name_prefix}-rtb-public", internet_route = true }   # default route to the internet gateway
-    private = { name = "${local.name_prefix}-rtb-private", internet_route = false } # no internet route, on purpose
+    # Default route to the internet gateway
+    public = {
+      name           = "${local.name_prefix}-rtb-public"
+      internet_route = true
+    }
+    # No internet route, on purpose
+    private = {
+      name           = "${local.name_prefix}-rtb-private"
+      internet_route = false
+    }
   }
 }
 

@@ -1,0 +1,13 @@
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Sid": "AllowServiceToAssumeRole",
+      "Effect": "Allow",
+      "Principal": {
+        "Service": "${service}"
+      },
+      "Action": "sts:AssumeRole"
+    }
+  ]
+}

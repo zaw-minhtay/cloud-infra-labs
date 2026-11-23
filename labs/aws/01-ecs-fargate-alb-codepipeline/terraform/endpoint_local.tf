@@ -3,13 +3,40 @@
 
 locals {
   vpc_endpoints = {
-    # Interface endpoints: private IPs in the app subnets, private DNS on
-    ecr-api        = { service = "ecr.api", type = "Interface", name = "${local.name_prefix}-vpce-ecr-api" }               # image metadata, login
-    ecr-dkr        = { service = "ecr.dkr", type = "Interface", name = "${local.name_prefix}-vpce-ecr-dkr" }               # image pulls
-    secretsmanager = { service = "secretsmanager", type = "Interface", name = "${local.name_prefix}-vpce-secretsmanager" } # DB password
-    logs           = { service = "logs", type = "Interface", name = "${local.name_prefix}-vpce-logs" }                     # container logs
+    # ---- Interface endpoints: private IPs in the app subnets, private DNS on ----
 
-    # Gateway endpoint: a route in the private route table; free. ECR stores image layers in S3.
-    s3 = { service = "s3", type = "Gateway", name = "${local.name_prefix}-vpce-s3" }
+    # Image metadata and registry login
+    ecr-api = {
+      service = "ecr.api"
+      type    = "Interface"
+      name    = "${local.name_prefix}-vpce-ecr-api"
+    }
+    # Image pulls
+    ecr-dkr = {
+      service = "ecr.dkr"
+      type    = "Interface"
+      name    = "${local.name_prefix}-vpce-ecr-dkr"
+    }
+    # The database password
+    secretsmanager = {
+      service = "secretsmanager"
+      type    = "Interface"
+      name    = "${local.name_prefix}-vpce-secretsmanager"
+    }
+    # Container logs
+    logs = {
+      service = "logs"
+      type    = "Interface"
+      name    = "${local.name_prefix}-vpce-logs"
+    }
+
+    # ---- Gateway endpoint: a route in the private route table; free ----
+
+    # ECR stores image layers in S3
+    s3 = {
+      service = "s3"
+      type    = "Gateway"
+      name    = "${local.name_prefix}-vpce-s3"
+    }
   }
 }

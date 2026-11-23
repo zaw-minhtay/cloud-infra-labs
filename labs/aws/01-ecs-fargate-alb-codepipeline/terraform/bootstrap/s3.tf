@@ -30,3 +30,13 @@ resource "aws_s3_bucket_public_access_block" "tfstate" {
   ignore_public_acls      = true
   restrict_public_buckets = true
 }
+
+# Bucket policy (policy/s3/tfstate_bucket_policy.json): refuse any request that isn't HTTPS.
+resource "aws_s3_bucket_policy" "tfstate" {
+  bucket = aws_s3_bucket.tfstate.id
+  policy = templatefile(local.s3.tfstate.policy_file, {
+    bucket_arn = aws_s3_bucket.tfstate.arn
+  })
+
+  depends_on = [aws_s3_bucket_public_access_block.tfstate]
+}
