@@ -5,7 +5,7 @@
 > access, backed by an Aurora MySQL cluster, and deployed by CodePipeline and CodeBuild on
 > every push to GitHub. Infrastructure is built with Terraform.
 
-**Related lab:** Lab 01 (aws) — ECS Fargate Service behind an ALB with CodePipeline *(in progress)*
+**Related lab:** [Lab 01 (aws) — ECS Fargate Service behind an ALB with CodePipeline](../../labs/aws/01-ecs-fargate-alb-codepipeline/README.md)
 
 ## Requirements
 
@@ -48,12 +48,12 @@
 | Network | Amazon VPC | 2 Availability Zones, each with three subnet tiers: public (ALB), private app (tasks), private DB (Aurora). No NAT gateway. |
 | Private AWS access | VPC endpoints | Interface endpoints for ECR (API and Docker), Secrets Manager, and CloudWatch Logs, plus a gateway endpoint for S3 (image layers), so the tasks never need the internet. |
 | Load balancer | Application Load Balancer | The public entry point. Spreads HTTP traffic across the healthy tasks in both AZs and checks `/healthz`. |
-| Container service | Amazon ECS on AWS Fargate | Runs 2 tasks of the web app, one per AZ. Rolling deployments with a circuit breaker that rolls back a failed release. |
+| Container service | Amazon ECS on AWS Fargate | Runs 2 tasks of the web app (Java 25, Spring Boot, on Amazon Corretto), one per AZ. Rolling deployments with a circuit breaker that rolls back a failed release. |
 | Database | Amazon Aurora MySQL | A writer instance in AZ a and a reader in AZ c. Storage is replicated across 3 AZs; if the writer fails, the reader is promoted. |
 | Database password | AWS Secrets Manager | Holds the database password, generated and managed by RDS. ECS injects it into the tasks at start-up as an environment variable. |
 | Logs and alarms | Amazon CloudWatch | Task logs, plus alarms for ALB 5xx errors, unhealthy targets, task CPU, and database CPU and connections. |
 | Permissions | AWS IAM | Separate least-privilege roles for CodePipeline, CodeBuild, the ECS task execution (pull image, read the DB secret, write logs), and the task itself. |
-| Infrastructure as code | Terraform | Creates everything above; state is stored in S3. |
+| Infrastructure as code | Terraform | Creates everything above from one codebase for dev, stg, and prd; each environment's state is stored in S3 in its own account. |
 
 Why each tool was chosen over the alternatives: see [Key decisions and trade-offs](#key-decisions-and-trade-offs).
 
@@ -61,7 +61,8 @@ Why each tool was chosen over the alternatives: see [Key decisions and trade-off
 
 | Item | Value |
 |---|---|
-| AWS account | A dedicated lab or dev account (not production) |
+| Environments | dev, stg, and prd, each in its **own AWS account** with its own state, network, pipeline, and branch. The values below are dev's; stg and prd use `10.1.0.0/16` and `10.2.0.0/16`. |
+| AWS account | The dev account (not production) |
 | Region | `ap-northeast-1` (Tokyo) |
 | Availability Zones | 2 (`ap-northeast-1a`, `ap-northeast-1c`) |
 | VPC CIDR | `10.0.0.0/16` |
@@ -112,9 +113,12 @@ Numbered to match the arrows in the diagram.
 | Deploy model | GitOps controller (pull) · pipeline deploys (push) | **Push (CodePipeline ECS action)** | ECS has no in-cluster GitOps controller; the pipeline's IAM role is limited to updating this one service |
 | GitHub connection | Personal access token · CodeConnections | **CodeConnections** | No GitHub token stored in AWS; access is granted through a GitHub App |
 | Image tag | `latest` · commit ID | **Commit ID** (immutable tags in ECR) | Every running task traces to a commit; a tag can never be overwritten |
-| Base image source | Docker Hub · ECR Public mirror | **ECR Public** (`public.ecr.aws/docker/library/python`) | Avoids Docker Hub rate limits on CodeBuild's shared IP addresses |
+| App runtime | Python · Node.js · Java 25 (Spring Boot) | **Java 25 + Spring Boot on Amazon Corretto** | The common enterprise stack; Corretto is AWS's own OpenJDK build; Java 25 is the current LTS |
+| Base images | Docker Hub · ECR Public | **ECR Public** (Maven + Corretto 25 to build, Corretto 25 headless to run) | Avoids Docker Hub rate limits on CodeBuild's shared IP addresses |
+| Environments | Workspaces in one account · separate accounts per environment | **Separate accounts (dev, stg, prd)** | A mistake in dev can't reach production; separate bills and permissions; Terraform refuses the wrong account |
 | Deployment safety | Plain rolling update · rolling update with circuit breaker · blue/green (CodeDeploy) | **Rolling update with circuit breaker** | Automatic rollback of a failed release with no extra service; blue/green is a later improvement |
 | Infrastructure as code | Console · CloudFormation · Terraform | **Terraform** | Repeatable, reviewable, and one command to destroy everything |
+| Terraform layout | One `main.tf` · code copied per environment · workspaces · reusable modules · Terragrunt | **One root configuration: `<service>.tf` + `<service>_local.tf`, `env/<env>/`** | One codebase for every environment (no drift), settings separated from resource code, no extra tools; modules become worth it once several apps reuse the platform ([details](../../labs/aws/01-ecs-fargate-alb-codepipeline/README.md#why-this-structure)) |
 
 ## Security
 
@@ -166,12 +170,12 @@ Approximate on-demand prices in `ap-northeast-1`; check the
 | Aurora MySQL: 2 × `db.t4g.medium` (writer + reader) | ~$0.23 per hour (+ small storage and I/O charges) |
 | 4 interface endpoints × 2 AZs | ~$0.11 per hour |
 | Application Load Balancer | ~$0.03 per hour (+ small usage charge) |
-| 2 Fargate tasks, 0.25 vCPU / 0.5 GB each | ~$0.03 per hour |
+| 2 Fargate tasks, 0.5 vCPU / 1 GB each | ~$0.06 per hour |
 | S3 gateway endpoint | Free |
 | Secrets Manager (1 secret) | ~$0.40 per month |
 | CodeBuild, CodePipeline (V2) | A few cents per pipeline run |
 | ECR, S3, CloudWatch Logs | Cents per month at lab scale |
-| **Total while running** | **~$0.40 per hour (~$10 per day)** |
+| **Total while running (dev)** | **~$0.43 per hour (~$10 per day)** |
 
 The biggest cost drivers are the two Aurora instances, then the interface endpoints; all are
 charged per hour even with no traffic. Run the lab and `terraform destroy` on the same day.
@@ -188,6 +192,8 @@ charged per hour even with no traffic. Run the lab and `terraform destroy` on th
 - **Image scanning:** ECR enhanced scanning (Amazon Inspector); fail the pipeline on critical
   findings.
 - **Edge protection:** AWS WAF on the ALB.
-- **Multiple environments:** dev / stg / prd from the same Terraform code with per-environment
-  variables, promoted through the pipeline with a manual approval stage.
+- **Release promotion:** a manual approval stage and cross-account deploys, so one release moves
+  dev → stg → prd instead of each environment building its own branch.
+- **Least-privilege database user:** an app-only MySQL user instead of the master user.
+- **Smaller runtime:** a custom Java runtime built with `jlink`, instead of the full Corretto image.
 - **Alerting:** send the CloudWatch alarms to SNS (email or chat).
