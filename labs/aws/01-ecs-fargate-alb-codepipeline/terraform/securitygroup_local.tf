@@ -20,13 +20,6 @@ locals {
     }
   }
 
-  ports = {
-    http  = 80
-    https = 443
-    app   = 8080
-    mysql = 3306
-  }
-
   # Each tier only accepts traffic from the tier in front of it:
   #   internet -> ALB :80 -> tasks :8080 -> Aurora :3306;  tasks -> VPC endpoints :443
   #

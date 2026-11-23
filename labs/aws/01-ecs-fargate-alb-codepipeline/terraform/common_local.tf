@@ -14,6 +14,14 @@ locals {
   # "ap-northeast-1a" -> "1a", used as the last part of per-AZ names
   az_suffix = [for az in var.azs : substr(az, length(az) - 2, 2)]
 
+  # Ports shared by the ALB, ECS, and the security groups
+  ports = {
+    http  = 80   # ALB listener
+    https = 443  # VPC endpoints
+    app   = 8080 # the Spring Boot app (server.port in application.properties)
+    mysql = 3306 # Aurora
+  }
+
   # Where this lab lives in the repository (CodeBuild paths and the pipeline trigger)
   lab_path = "labs/aws/01-ecs-fargate-alb-codepipeline"
 
