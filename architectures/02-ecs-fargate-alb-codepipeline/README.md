@@ -11,7 +11,8 @@
 
 - **Functional**
   - Users reach the web app over HTTP through a single public endpoint (the ALB DNS name).
-  - The app stores data in a MySQL-compatible database (a visit counter), which survives task
+  - Users can store data and later retrieve or update it through a small REST API (create,
+    list, get, update items). The data lives in a MySQL-compatible database and survives task
     restarts and deployments.
   - A push to `main` that changes the app builds a new image and deploys it to ECS with no
     manual steps.
@@ -92,7 +93,7 @@ Numbered to match the arrows in the diagram.
 7. A user opens `http://<alb-dns-name>/`; the request enters through the internet gateway to
    the ALB.
 8. The ALB forwards it to a healthy task in either AZ on port 8080.
-9. The task reads and updates the visit counter in Aurora through the cluster's writer
+9. The task stores, retrieves, or updates the user's data in Aurora through the cluster's writer
    endpoint (MySQL, port 3306).
 
 ## Key decisions and trade-offs
