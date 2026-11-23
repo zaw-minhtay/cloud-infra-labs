@@ -10,6 +10,11 @@ source. Reuse these instead of icons from third-party icon sites.
 | `k8s-*.svg` | [kubernetes/community](https://github.com/kubernetes/community/tree/master/icons) `icons/svg/resources/labeled/` | Apache-2.0 or CC-BY-4.0 |
 | `argo.svg` | [cncf/artwork](https://github.com/cncf/artwork/tree/main/projects/argo) `projects/argo/icon/color/` | [CNCF brand guidelines](https://www.cncf.io/brand-guidelines/) |
 
+**AWS icons** are not stored here: use draw.io's built-in **AWS** shape library
+(`mxgraph.aws4.*`), which draws the official
+[AWS Architecture Icons](https://aws.amazon.com/architecture/icons/) and their group
+styles (AWS Cloud, Region, VPC, subnets).
+
 Logos are used only to identify the tools in architecture diagrams, not to imply
 endorsement.
 

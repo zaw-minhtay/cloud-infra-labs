@@ -119,6 +119,7 @@ fresh machine, not for the owner's setup.
   ```
 - Use only the official icons in [assets/icons/](assets/icons/) (see its README for sources
   and licenses). Add new ones from the project's official repo, never from icon sites.
+  For AWS, use draw.io's built-in AWS library (official AWS Architecture Icons and groups).
 - Arrow colours: blue solid = CI / build (push), purple dashed = GitOps control (pull),
   green = runtime / data. Number the steps of a flow.
 - Keep diagrams visual: components, numbered arrows, and a one-line legend. Step details,
