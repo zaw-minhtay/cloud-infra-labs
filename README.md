@@ -1,7 +1,8 @@
 # Cloud & Infrastructure Labs
 
 Hands-on labs, system architecture designs, and how-to notes from my work as a cloud and
-infrastructure engineer. Everything here was built and run by me on real cloud accounts.
+infrastructure engineer. Everything here was built and run by me, on real cloud accounts or
+on a local Kubernetes cluster.
 
 ## Architectures
 
@@ -9,7 +10,7 @@ System designs: diagram, decisions, trade-offs, and cost.
 
 | # | Architecture | What it covers | Related lab |
 |---|---|---|---|
-| | *Coming soon* | | |
+| 01 | [GitOps Pipeline with GitHub Actions and Argo CD on Local Kubernetes](architectures/01-gitops-github-actions-argocd/README.md) | Pull-based GitOps: CI builds and publishes images, Argo CD deploys from Git; failure handling, security, and trade-offs | [ci-cd/01](labs/ci-cd/01-gitops-github-actions-argocd/README.md) |
 
 ## Labs
 
@@ -17,7 +18,7 @@ Hands-on builds, grouped by the main skill they practise.
 
 | Category | # | Lab | What it covers | Tools |
 |---|---|---|---|---|
-| | | *Coming soon* | | |
+| ci-cd | 01 | [GitOps Pipeline with GitHub Actions and Argo CD on Local Kubernetes](labs/ci-cd/01-gitops-github-actions-argocd/README.md) | Every push is tested, built for arm64 + amd64, published to GHCR, and deployed by Argo CD; self-heal and Git rollback | GitHub Actions, GHCR, Argo CD, Kubernetes (kind), Kustomize, Docker |
 
 ## Notes
 

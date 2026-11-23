@@ -145,9 +145,6 @@ Expected: `kubectl get nodes` shows one node, `smoke-test-control-plane`, with
 
 ## Part 2 — Build and deploy
 
-> ⚠️ **Status:** these steps are written but not yet run end-to-end. This note is removed
-> once every step has been run and its output checked.
-
 Run every command from the lab folder (`cloud-infra-labs/labs/ci-cd/01-gitops-github-actions-argocd`)
 unless a step says otherwise.
 
