@@ -11,6 +11,7 @@ System designs: diagram, decisions, trade-offs, and cost.
 | # | Architecture | What it covers | Related lab |
 |---|---|---|---|
 | 01 | [GitOps Pipeline with GitHub Actions and Argo CD on Local Kubernetes](architectures/01-gitops-github-actions-argocd/README.md) | Pull-based GitOps: CI builds and publishes images, Argo CD deploys from Git; failure handling, security, and trade-offs | [ci-cd/01](labs/ci-cd/01-gitops-github-actions-argocd/README.md) |
+| 02 | [ECS Fargate Service behind an ALB with CodePipeline](architectures/02-ecs-fargate-alb-codepipeline/README.md) | Highly available ALB + ECS Fargate (one task per AZ) with Aurora MySQL, all in private subnets with VPC endpoints (no NAT); CodePipeline + CodeBuild deploy on every push; Terraform | aws/01 *(in progress)* |
 
 ## Labs
 
