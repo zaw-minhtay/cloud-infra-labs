@@ -1,0 +1,28 @@
+# CodeBuild instructions for Lab 01 (aws). CodePipeline runs this in the Build stage.
+# The Docker build runs the Maven tests; a failing test stops the pipeline here.
+#
+# Set by Terraform on the CodeBuild project: ECR_REPOSITORY_URL, ECR_REGISTRY, APP_DIR, CONTAINER_NAME
+# Set by CodePipeline from the Source stage:  COMMIT_ID
+version: 0.2
+
+phases:
+  pre_build:
+    on-failure: ABORT
+    commands:
+      - IMAGE_TAG=$(echo "$COMMIT_ID" | cut -c1-7)
+      - echo "Building $ECR_REPOSITORY_URL:$IMAGE_TAG"
+      - aws ecr get-login-password --region "$AWS_REGION" | docker login --username AWS --password-stdin "$ECR_REGISTRY"
+  build:
+    on-failure: ABORT   # a failed build or test must not push anything
+    commands:
+      - docker build --build-arg APP_VERSION="$IMAGE_TAG" -t "$ECR_REPOSITORY_URL:$IMAGE_TAG" "$APP_DIR"
+  post_build:
+    commands:
+      - docker push "$ECR_REPOSITORY_URL:$IMAGE_TAG"
+      # Tells the Deploy stage which image to run in the "$CONTAINER_NAME" container.
+      - printf '[{"name":"%s","imageUri":"%s"}]' "$CONTAINER_NAME" "$ECR_REPOSITORY_URL:$IMAGE_TAG" > imagedefinitions.json
+      - cat imagedefinitions.json
+
+artifacts:
+  files:
+    - imagedefinitions.json
