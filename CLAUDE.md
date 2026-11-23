@@ -34,7 +34,7 @@ Follow the **Naming rules** in [README.md](README.md). In short:
 | Architecture | `architectures/NN-system-name/` |
 | Note | `notes/topic-name/` |
 | Titles | `# Lab NN — Title`, `# Architecture NN — Title` |
-| Terraform files | `main.tf`, `variables.tf`, `outputs.tf`, `versions.tf` |
+| Terraform files and AWS resource names | Chosen per lab; documented in the lab's README |
 | Diagram | `diagram.drawio` (source) + `diagram.png` (export), next to the README |
 
 - Create new labs and architectures with the script, never by hand:
@@ -90,6 +90,14 @@ Every lab has **two files** (both created by `new.sh`):
   confirm it is gone); **Troubleshooting**.
 - Steps are numbered continuously across all parts, so the README can point to "step 12".
 - No step is repeated: a check belongs in Verify, not also in Build and deploy.
+- When the guide is long, split it: `SETUP.md` becomes a short index, and each part goes in
+  `setup/N-part.md` (plus `setup/troubleshooting.md`), with step numbers continuing across files.
+
+**Terraform:**
+- The Terraform layout and AWS naming are chosen **per lab** and documented in that lab's
+  README (layout, naming rule, environments). Don't copy one lab's structure into another
+  unless the owner asks.
+- Check before handing over: `terraform fmt -check -recursive` and `terraform validate`.
 
 **Written for the public:** this repo is public, so every lab is written for a stranger on a
 fresh machine, not for the owner's setup.
@@ -108,6 +116,8 @@ fresh machine, not for the owner's setup.
 - Every lab must end with cleanup steps that remove everything it created.
 - Local labs run on an **Apple Silicon (arm64) Mac with 8 GB RAM**: build images for
   `linux/arm64` (and `linux/amd64` for CI), and keep clusters small.
+- Pull base images from **ECR Public** (`public.ecr.aws/...`), not Docker Hub, to avoid rate
+  limits in CI.
 
 ## 4. Diagrams
 
