@@ -10,7 +10,6 @@ locals {
     container = {
       name = "app" # buildspec/buildspec.yml writes this name into imagedefinitions.json
       port = local.ports.app
-      user = "10001" # non-root, matches the Dockerfile
       # Placeholder until the first pipeline run; CodePipeline then owns the image.
       initial_image = "${aws_ecr_repository.app.repository_url}:initial"
     }

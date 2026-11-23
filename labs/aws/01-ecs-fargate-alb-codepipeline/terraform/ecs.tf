@@ -27,7 +27,6 @@ resource "aws_ecs_task_definition" "app" {
     name                   = local.ecs.container.name
     image                  = local.ecs.container.initial_image
     essential              = true
-    user                   = local.ecs.container.user
     readonlyRootFilesystem = true
 
     portMappings = [{ containerPort = local.ecs.container.port, protocol = "tcp" }]
