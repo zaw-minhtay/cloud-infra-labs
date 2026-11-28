@@ -36,7 +36,7 @@ public class ItemController {
 
     @GetMapping("/info")
     public Map<String, String> info() {
-        return Map.of("app", "items-api-v2", "version", version);
+        return Map.of("app", "items-api", "version", version);
     }
 
     // Kept independent of the database on purpose: a short Aurora failover must not make
