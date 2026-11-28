@@ -9,11 +9,15 @@ source. Reuse these instead of icons from third-party icon sites.
 | `kubernetes.svg` | [kubernetes/kubernetes](https://github.com/kubernetes/kubernetes/tree/master/logo) `logo/logo.svg` | Apache-2.0; the Kubernetes logo is a trademark of The Linux Foundation |
 | `k8s-*.svg` | [kubernetes/community](https://github.com/kubernetes/community/tree/master/icons) `icons/svg/resources/labeled/` | Apache-2.0 or CC-BY-4.0 |
 | `argo.svg` | [cncf/artwork](https://github.com/cncf/artwork/tree/main/projects/argo) `projects/argo/icon/color/` | [CNCF brand guidelines](https://www.cncf.io/brand-guidelines/) |
+| `kyverno.svg` | [cncf/artwork](https://github.com/cncf/artwork/tree/main/projects/kyverno) `projects/kyverno/icon/color/kyverno-icon-color.svg` | [CNCF brand guidelines](https://www.cncf.io/brand-guidelines/) |
+| `aws-signer.svg` | [AWS Architecture Icons](https://aws.amazon.com/architecture/icons/) "Icon package" (2026-07-31 release), `Arch_Security-Identity/64/Arch_AWS-Signer_64.svg` | AWS allows customers to use these icons to create architecture diagrams |
 
 **AWS icons** are not stored here: use draw.io's built-in **AWS** shape library
 (`mxgraph.aws4.*`), which draws the official
 [AWS Architecture Icons](https://aws.amazon.com/architecture/icons/) and their group
-styles (AWS Cloud, Region, VPC, subnets).
+styles (AWS Cloud, Region, VPC, subnets). The exception is an icon the draw.io library doesn't
+have yet (`aws-signer.svg`): take it unmodified from AWS's official icon package and list it
+above.
 
 Logos are used only to identify the tools in architecture diagrams, not to imply
 endorsement.

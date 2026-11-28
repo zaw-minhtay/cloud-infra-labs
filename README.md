@@ -12,6 +12,7 @@ System designs: diagram, decisions, trade-offs, and cost.
 |---|---|---|---|
 | 01 | [GitOps Pipeline with GitHub Actions and Argo CD on Local Kubernetes](architectures/01-gitops-github-actions-argocd/README.md) | Pull-based GitOps: CI builds and publishes images, Argo CD deploys from Git; failure handling, security, and trade-offs | [ci-cd/01](labs/ci-cd/01-gitops-github-actions-argocd/README.md) |
 | 02 | [ECS Fargate Service behind an ALB with CodePipeline](architectures/02-ecs-fargate-alb-codepipeline/README.md) | Highly available ALB + ECS Fargate (one task per AZ) with Aurora MySQL, all in private subnets with VPC endpoints (no NAT); CodePipeline + CodeBuild deploy on every push; Terraform | [aws/01](labs/aws/01-ecs-fargate-alb-codepipeline/README.md) |
+| 03 | [GitOps Platform on EKS with Image Scanning and Signing](architectures/03-eks-gitops-image-scanning-signing/README.md) | Private EKS across 2 AZs; Argo CD deploys from Git, one Application per namespace; a version tag releases only images Amazon Inspector passed, ECR signs them with AWS Signer, and Kyverno admits only signed images; DynamoDB through Pod Identity; Terraform | Planned: kubernetes/01 |
 
 ## Labs
 
@@ -72,7 +73,7 @@ The script picks the next number and copies the template. Then:
 | Lab title | `# Lab NN — Title` | `# Lab 01 — GitOps Pipeline with GitHub Actions and Argo CD on Local Kubernetes` |
 | Architecture title | `# Architecture NN — Title` | `# Architecture 01 — GitOps Pipeline with GitHub Actions and Argo CD on Local Kubernetes` |
 | Terraform files and AWS resource names | Chosen per lab and documented in that lab's README | [aws/01: Terraform structure](labs/aws/01-ecs-fargate-alb-codepipeline/README.md#terraform-structure) |
-| Diagram | `diagram.drawio` (source, edit in draw.io) + `diagram.png` (export) next to the README | |
+| Diagram | `diagram.drawio` (source, edit in draw.io) + `diagram.png` (export) next to the README; each further page exports to `diagram-<page>.png` | `diagram-cicd.png` |
 
 Names use lowercase letters, numbers, and hyphens only.
 

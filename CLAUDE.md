@@ -38,7 +38,7 @@ Follow the **Naming rules** in [README.md](README.md). In short:
 | Note | `notes/topic-name/` |
 | Titles | `# Lab NN — Title`, `# Architecture NN — Title` |
 | Terraform files and AWS resource names | Chosen per lab; documented in the lab's README |
-| Diagram | `diagram.drawio` (source) + `diagram.png` (export), next to the README |
+| Diagram | `diagram.drawio` (source) + `diagram.png` (export), next to the README; a second page exports to `diagram-<page>.png` (e.g. `diagram-cicd.png`) |
 
 - Create new labs and architectures with the script, never by hand:
   `./new.sh lab <category> <name>` and `./new.sh arch <name>`.
@@ -130,6 +130,8 @@ fresh machine, not for the owner's setup.
   ```bash
   /Applications/draw.io.app/Contents/MacOS/draw.io -x -f png -s 1.5 -b 10 -o diagram.png diagram.drawio
   ```
+  With more than one page, export each page by its number (1-based), e.g.
+  `-p 2 -o diagram-cicd.png`.
 - Use only the official icons in [assets/icons/](assets/icons/) (see its README for sources
   and licenses). Add new ones from the project's official repo, never from icon sites.
   For AWS, use draw.io's built-in AWS library (official AWS Architecture Icons and groups).

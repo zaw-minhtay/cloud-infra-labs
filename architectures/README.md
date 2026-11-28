@@ -9,7 +9,11 @@ order, `NN-system-name`, and starts from
 
 ```
 architectures/
-└── 01-gitops-github-actions-argocd/
+├── 01-gitops-github-actions-argocd/
+├── 02-ecs-fargate-alb-codepipeline/
+└── 03-eks-gitops-image-scanning-signing/
     ├── README.md
-    └── diagram.png
+    ├── diagram.drawio        draw.io source: one page per diagram
+    ├── diagram.png           page 1 (the overall design)
+    └── diagram-cicd.png      page 2, when there is one (here: the CI/CD flow)
 ```
