@@ -3,13 +3,12 @@
 > A Kubernetes platform on Amazon EKS, designed the way a platform team runs one: GitHub Actions
 > builds and scans every change, a version tag (`v1.2.0`) releases an image only if Amazon
 > Inspector found no critical vulnerabilities, Amazon ECR signs it with AWS Signer, Argo CD
-> deploys it from Kustomize manifests in a GitOps repository, and Kyverno lets the cluster run
-> only signed images. A small web app (a page plus the REST API behind it) stores its data in
-> DynamoDB. As in a company, the app code, the GitOps configuration, and the infrastructure
-> (Terraform) live in separate repositories.
+> deploys it from Kustomize manifests in a GitOps repository, and OPA Gatekeeper with Ratify
+> lets the cluster run only signed images. A small web app (a page plus the REST API behind it)
+> stores its data in DynamoDB. As in a company, the app code, the GitOps configuration, and the
+> infrastructure (Terraform) live in separate repositories.
 
-**Related lab:** Lab 01 (kubernetes) — GitOps Platform on EKS with Image Scanning and Signing
-*(built after this design is reviewed)*
+**Related lab:** [Lab 01 (kubernetes) — GitOps Platform on EKS with Image Scanning and Signing](../../labs/kubernetes/01-eks-gitops-image-scanning-signing/README.md)
 
 ## Requirements
 
@@ -34,8 +33,8 @@
     image reaches the release repository.
   - **The cluster runs only images our pipeline signed:** an unsigned image, or one from another
     registry, is rejected when the pod is created.
-  - Cluster add-ons (load balancer controller, policies, metrics) are installed from Git by
-    Argo CD, like the app, not by hand.
+  - Cluster add-ons (load balancer controller, metrics) and the admission policies are
+    installed from Git by Argo CD, like the app; nothing is installed by hand.
   - A bad release is rolled back by setting the previous version back in Git.
   - All AWS infrastructure is created and destroyed with Terraform.
 - **Non-functional**
@@ -90,16 +89,18 @@ Both are pages of [diagram.drawio](./diagram.drawio). The numbers match
 | Kubernetes control plane | Amazon EKS | Managed control plane; API access through EKS access entries; Kubernetes secrets encrypted with a KMS key. |
 | Nodes | EKS managed node group | 2 × `t3.medium`, one per AZ, in private subnets. AWS patches the node AMI; Terraform sets the size. |
 | Cluster networking | Amazon VPC CNI (EKS add-on) | Gives each pod an IP from the VPC, and enforces Kubernetes NetworkPolicies. |
-| Pod access to AWS | EKS Pod Identity (Pod Identity Agent add-on) | Maps a Kubernetes service account to one IAM role: the app to its DynamoDB table, the load balancer controller to ELB APIs. |
+| Pod access to AWS | EKS Pod Identity (Pod Identity Agent add-on); one IRSA role | Maps a Kubernetes service account to one IAM role: the app to its DynamoDB table, the load balancer controller to ELB APIs, the EBS CSI driver to EBS. Ratify uses IRSA instead: its ECR login reads only IRSA's settings. |
 | Other EKS add-ons | CoreDNS, kube-proxy, EBS CSI driver | Cluster DNS, service routing, and volumes (managed by EKS). |
 | GitOps controller | Argo CD | Runs in the cluster, pulls from the GitOps repository, and keeps the cluster matching it (sync and self-heal). App-of-apps: one root Application creates the others. AppProjects limit what each group of Applications may deploy, and where. |
-| One Application per namespace | Argo CD ApplicationSets (cluster generator) | Create one Application per namespace (`argocd`, `kyverno`, `platform`, `sample-web-app`) and fill in each cluster's own values from its annotations, which Terraform sets: ECR registry, Signer profile ARN, cluster name, VPC ID. Nothing account-specific is written in Git. |
-| Admission policies | Kyverno + `kyverno-notation-aws` | Kyverno checks every pod before it runs. Its AWS Signer extension verifies the image's signature; other Kyverno policies enforce pod security. |
+| One Application per namespace | Argo CD ApplicationSets (cluster generator) | Create one Application per namespace (`argocd`, `gatekeeper`, `platform`, `sample-web-app`) and fill in each cluster's own values from its annotations, which Terraform sets: ECR registry and release repository, cluster name, VPC ID, region, and the GitOps repository's address. Nothing account-specific is written in Git. |
+| Admission policies | OPA Gatekeeper | Checks every new pod in the `app-*` namespaces against policies from the GitOps repository: signed image, our `release` repository only, image referenced by digest, read-only root file system, CPU and memory limits. Its audit re-checks running pods every minute. |
+| Signature verification | Ratify, with the AWS Signer plugin | Answers Gatekeeper's question "is this image signed by our Signer profile, and is the signature still valid?": it checks the signature against AWS Signer's root certificate and asks Signer whether it was revoked. |
+| Pod security | Pod Security Admission (built into Kubernetes) | The `restricted` level on the `app-*` namespaces: pods run as non-root, with no privilege escalation, all Linux capabilities dropped, and a seccomp profile. |
 | Load balancing | AWS Load Balancer Controller | Creates an Application Load Balancer from the app's Ingress and sends traffic straight to the pod IPs. |
 | Metrics | metrics-server | Pod CPU and memory, used by the HorizontalPodAutoscaler. |
 | App | `sample-web-app` (container) | A web page at `/` (a table of the items, with add and edit, and the running version) and the REST API it calls: `POST/GET /items`, `GET/PUT /items/{id}`, `/info` (name and version), `/healthz`. Stores items in DynamoDB. |
 | Database | Amazon DynamoDB | One on-demand table for the items. No servers, encrypted at rest, point-in-time recovery. |
-| Infrastructure as code | Terraform (in this lab's folder of `cloud-infra-labs`) | Creates the AWS side (VPC, EKS, node group, ECR, Signer profile, IAM, DynamoDB), installs Argo CD once, and registers the cluster in Argo CD with its environment label and per-cluster annotations; Argo CD then manages itself and everything else from the GitOps repository. |
+| Infrastructure as code | Terraform (in this lab's folder of `cloud-infra-labs`) | Creates the AWS side (VPC, EKS, node group, ECR, Signer profile, IAM, DynamoDB), installs Gatekeeper and Ratify, installs Argo CD once, registers the cluster in Argo CD with its environment label and per-cluster annotations, and creates the root Application; Argo CD then manages itself and everything else from the GitOps repository. |
 
 Why each tool was chosen over the alternatives: see [Key decisions and trade-offs](#key-decisions-and-trade-offs).
 
@@ -130,7 +131,8 @@ sample-web-app/
 **How a release reaches the GitOps repository:** the release workflow gets a token from a GitHub
 App that is installed only on `eks-platform-gitops` and may only push branches and open pull
 requests there; the token lasts one hour. The pull request sets the new version and digest in
-`overlays/dev` and merges automatically once its checks pass. A `CODEOWNERS` file requires a
+`overlays/dev`; the workflow first checks that the overlay still builds with the new image, then
+merges the pull request. A `CODEOWNERS` file requires a
 reviewer for every other path, so the automatic pull request can change nothing but dev's
 version; stg and prd always wait for a review.
 
@@ -149,7 +151,7 @@ version; stg and prd always wait for a review.
 | Cluster API access | Private endpoint for the nodes; public endpoint limited to the admin's IP address. The CI pipeline never calls the API: it only writes to Git. |
 | Internet access | Inbound HTTP :80 to the load balancer only. Outbound from the nodes through the NAT gateway. |
 | App URL | `http://<load-balancer-dns-name>/` (the web page; the API is under `/items`) |
-| Terraform state | S3 bucket with native state locking; no account ID in any file (read from the AWS login, as in Architecture 02) |
+| Terraform state | S3 bucket with native state locking, one state per stack (network, cluster, platform); no account ID in any file (read from the AWS login, as in Architecture 02) |
 
 ## Kubernetes platform design
 
@@ -162,9 +164,9 @@ syncs, shows its health, and rolls back on its own.
 |---|---|---|---|
 | `kube-system` | EKS add-ons: VPC CNI, CoreDNS, kube-proxy, Pod Identity Agent, EBS CSI driver | None: EKS managed add-ons, set by Terraform | — |
 | `argocd` | Argo CD | `argocd` (`argocd/`). Terraform installs Argo CD once; after that, Argo CD upgrades itself from the GitOps repository | — |
-| `kyverno` | Kyverno, the AWS Signer extension, and the policies | `kyverno` (`kyverno/`) | ECR registry and Signer profile ARN, which the signature policy trusts |
+| `gatekeeper-system` | OPA Gatekeeper, Ratify, and the policies | `gatekeeper` (`gatekeeper/`): the policies only. Terraform installs Gatekeeper and Ratify themselves (see [Key decisions](#key-decisions-and-trade-offs)) | ECR registry and release repository, the only one the policies allow. Ratify gets the Signer profile ARN from Terraform |
 | `platform` | AWS Load Balancer Controller, metrics-server | `platform` (`platform/`, two Helm charts) | Cluster name, VPC ID, region |
-| `app-dev` | The app | `sample-web-app` (`sample-web-app/overlays/dev`) | ECR registry |
+| `app-dev` | The app, at Pod Security Admission's `restricted` level | `sample-web-app` (`sample-web-app/overlays/dev`) | ECR registry and release repository |
 
 **GitOps repository layout** (`eks-platform-gitops`): the Argo CD objects (*which* manifests go
 *where*) are kept apart from the manifests themselves (*what* is deployed).
@@ -172,57 +174,66 @@ syncs, shows its health, and rolls back on its own.
 ```
 eks-platform-gitops/
 ├── .github/CODEOWNERS             a reviewer for every path except overlays/dev
-├── bootstrap/
-│   └── root-app.yaml              the one Application Terraform creates; it syncs apps/
 ├── apps/                          Argo CD objects only
 │   ├── projects.yaml              AppProjects: platform, workloads (what each may deploy, where)
-│   ├── platform.yaml              ApplicationSet → Applications argocd, kyverno, platform
+│   ├── platform.yaml              ApplicationSets → Applications argocd, gatekeeper, platform
 │   └── workloads.yaml             ApplicationSet → Application sample-web-app (namespace app-<env>)
 └── manifests/                     what is deployed: plain Kubernetes YAML and Helm values
     ├── argocd/                    Argo CD's own Helm values
-    ├── kyverno/                   Kyverno + kyverno-notation-aws (Helm values)
-    │   └── policies/              verify-signature, pod-security, disallow-latest
+    ├── gatekeeper/                the policies for the app-* namespaces (Kustomize)
+    │   ├── templates/             signature (Ratify), repository, digest, read-only, limits
+    │   ├── constraints.yaml       where each policy applies: pods in app-*
+    │   └── aws-signer-plugin.yaml loads the AWS Signer plugin into Ratify
     ├── platform/                  AWS Load Balancer Controller, metrics-server (Helm values)
     └── sample-web-app/
-        ├── base/                  Deployment, Service, Ingress, HPA, PDB, NetworkPolicy
-        └── overlays/{dev,stg,prd}/  version + digest, replicas, quota, limits per environment
+        ├── base/                  Deployment, Service, Ingress, HPA, PDB, NetworkPolicy, quota
+        └── overlays/{dev,stg,prd}/  version + digest, settings, sizes per environment
 ```
 
 - `manifests/` holds only Kubernetes YAML and Helm values, with no Argo CD objects, so it can be
   reviewed, and even applied, on its own.
-- `apps/` decides where each part goes: the two ApplicationSets create one Application per
-  namespace in each cluster, and the AppProjects limit what each may deploy. The `workloads`
-  project can deploy only into `app-*` namespaces and can't create cluster-wide objects.
+- `apps/` decides where each part goes: the ApplicationSets create one Application per namespace
+  in each cluster, and the AppProjects limit what each may deploy. The `workloads` project can
+  deploy only into `app-*` namespaces, and its only cluster-wide object is its own namespace.
 
 The app's manifests are plain YAML (Kustomize). An overlay holds only what differs per
 environment; a release changes just the version and digest:
 
 ```yaml
-# manifests/sample-web-app/overlays/dev/kustomization.yaml
+# manifests/sample-web-app/overlays/dev/kustomization.yaml, after release 1.2.0
+namespace: app-dev
 resources:
   - ../../base
-images:
+images:                          # written by the release workflow
   - name: sample-web-app
     newTag: "1.2.0"
-    digest: sha256:…        # written by the release workflow
+    digest: sha256:…
+configMapGenerator:
+  - name: sample-web-app-settings
+    literals:
+      - AWS_REGION=ap-northeast-1
+      - TABLE_NAME=k8slab01-dev-items
+      - APP_VERSION=1.2.0        # written by the release workflow
 ```
 
 **No account ID in Git.** Some values differ per account: the image address
 (`<account-id>.dkr.ecr.ap-northeast-1.amazonaws.com/<release-repository>`) and the Signer profile
 ARN, which both contain the account ID, and the cluster name and VPC ID. None of them is written
-in a file. When Terraform registers the cluster in Argo CD, it sets them on the cluster's entry
-as annotations, next to an environment label. The ApplicationSets read them as they create each
-Application and pass them to Kustomize and Helm, so the same files work for dev, stg, and prd,
-each in its own account.
+in a file. Terraform gives the profile ARN straight to Ratify when it installs it. The others it
+sets on the cluster's entry in Argo CD as annotations, next to an environment label; the
+ApplicationSets read them as they create each Application and pass them to Kustomize and Helm,
+so the same files work for dev, stg, and prd, each in its own account.
 
-**Standards every workload must meet** (enforced by Kyverno, or set in `base/`)
+**Standards every workload must meet** (enforced by Gatekeeper or Pod Security Admission, or set
+in `base/`)
 
 | Standard | How |
 |---|---|
-| Runs only signed images from our `release` repository | Kyverno `verifyImages` policy (AWS Signer) |
-| Non-root, read-only root file system, no privilege escalation, all Linux capabilities dropped | Kyverno pod-security policy; a writable `/tmp` comes from an `emptyDir` volume |
-| No `:latest`; images referenced by digest | Kyverno policy; the pipeline writes the digest |
-| CPU and memory requests and limits | Kyverno policy; `LimitRange` defaults per namespace |
+| Runs only images signed by our Signer profile, from our `release` repository | Gatekeeper asks Ratify to check the signature (made by our profile, not revoked); a second Gatekeeper policy allows only the `release` repository |
+| Non-root, no privilege escalation, all Linux capabilities dropped, seccomp | Pod Security Admission, `restricted` level on the `app-*` namespaces |
+| Read-only root file system | Gatekeeper policy; a writable `/tmp` comes from an `emptyDir` volume |
+| Images referenced by digest, never by a tag alone (no `:latest`) | Gatekeeper policy; the release workflow writes the digest |
+| CPU and memory requests and limits | Gatekeeper policy; `LimitRange` defaults per namespace |
 | At least 2 replicas, spread across AZs | `topologySpreadConstraints`; `PodDisruptionBudget` keeps 1 running during node drains |
 | Scales with load | `HorizontalPodAutoscaler` on CPU (2–4 replicas in dev) |
 | Health checked | readiness and liveness probes on `/healthz` |
@@ -274,9 +285,11 @@ Numbered to match the arrows in the diagram.
 7. Argo CD, running in the cluster, watches `eks-platform-gitops` and sees the merged change: the
    `sample-web-app` Application (namespace `app-dev`) syncs the new version, with the registry address
    from the cluster's annotations.
-8. Before each new pod starts, the Kubernetes API server asks Kyverno. Kyverno checks the
-   signature through AWS Signer and checks the pod-security rules; an unsigned image, or one from
-   any other registry, is rejected.
+8. Before each new pod starts, the Kubernetes API server checks it against Pod Security
+   Admission's `restricted` level and asks Gatekeeper. Gatekeeper checks its policies and asks
+   Ratify about the image: Ratify reads the image's signature from ECR, checks that our Signer
+   profile made it, and asks AWS Signer whether it was revoked. An unsigned image, or one from
+   any other repository, is rejected.
 9. The nodes pull the image from ECR: API calls through the NAT gateway, image layers from S3
    through the gateway endpoint.
 
@@ -297,17 +310,19 @@ Numbered to match the arrows in the diagram.
 | Deploy model | CI pushes with `kubectl` · GitOps pull (Argo CD) | **GitOps with Argo CD** | Git is the single source of truth; the CI pipeline never holds cluster credentials; drift is corrected and every change can be reverted in Git |
 | Repositories | One repository for everything · **app, GitOps, and infrastructure in separate repositories** | **Separate**: `sample-web-app`, `eks-platform-gitops`, and Terraform in this lab | As in most companies: each team owns its repository and its permissions; deployment changes are reviewed apart from code; Argo CD reads only configuration, never the app code; the app's tags are its own versions |
 | Version change in the GitOps repository | Argo CD Image Updater · a manual "promote" workflow · **a pull request from the release workflow (GitHub App)** | **Pull request through a GitHub App** | Every deployment is a reviewed, revertible commit, with no extra controller holding Git write access in the cluster; the App's token lasts one hour and works only on the GitOps repository. Trade-off: the App's private key is stored as a GitHub secret |
-| Add-on installation | Terraform Helm releases · Argo CD from Git | **Argo CD from Git** (Terraform installs only Argo CD, which then manages its own upgrades) | Add-ons are versioned and reviewed like the app; Terraform stays focused on AWS resources |
+| Add-on installation | Terraform Helm releases · Argo CD from Git | **Argo CD from Git**; Terraform installs only Argo CD (which then manages its own upgrades) and the admission controllers | Add-ons are versioned and reviewed like the app; Terraform stays focused on AWS resources. The exception is Ratify: its chart makes its TLS certificate with Helm functions and hooks that only a real Helm install runs, so Terraform installs it, and Gatekeeper with it, since Ratify's install needs Gatekeeper running. Their policies still come from Git |
 | Argo CD Applications | One per cluster (everything in one) · **one per namespace** | **One per namespace** | Each part syncs, shows its health, and rolls back on its own, so a broken policy change doesn't block an app release; AppProjects limit each Application to its own namespaces |
 | GitOps repository layout | Applications next to their manifests · **Argo CD objects (`apps/`) apart from the manifests (`manifests/`)** | **Separate folders** | `manifests/` stays plain Kubernetes YAML and Helm values that work without Argo CD; changes to *what* is deployed and to *where* it goes are reviewed separately |
 | When to release | Deploy every push to `main` · **release on a version tag** | **Version tag (`v1.2.0`)** | A push only builds and scans; a release is a deliberate, named version with a GitHub Release, and the same version is promoted unchanged to stg and prd |
 | App manifests | Helm chart (templates, packaged in ECR) · **Kustomize (plain YAML in Git)** | **Kustomize** | What's in Git is exactly what's applied, so it's easy to review and debug; each environment's overlay changes only a few values. The add-ons still come as Helm charts |
-| Per-account values (image registry, Signer profile ARN, cluster name) | Written in the manifests · **cluster annotations read by the ApplicationSets** | **Cluster annotations** | The registry and the profile ARN contain the account ID, which must not be in Git; Terraform knows the values and sets them on the cluster, so the same files work in every account |
+| Per-account values (image registry, cluster name, VPC ID) | Written in the manifests · **cluster annotations read by the ApplicationSets** | **Cluster annotations** | The registry contains the account ID, which must not be in Git; Terraform knows the values and sets them on the cluster, so the same files work in every account. The Signer profile ARN goes from Terraform straight to Ratify |
 | Vulnerability scanning | Trivy in CI · ECR basic scanning · **Inspector (ECR enhanced)** | **Inspector** | AWS-managed, scans OS and language packages, rescans when new CVEs appear, and shows where each image runs |
 | Image signing | Cosign + KMS key · **AWS Signer via ECR managed signing** | **AWS Signer, managed by ECR** | No signing tool or key handling in the pipeline: ECR signs on push; Signer keys are AWS-managed; no extra charge |
 | What a signature means | Sign every build · **sign only after the scan passes** | **Two repositories: `candidate` (scanned) → `release` (signed)** | Managed signing signs at push time, before a scan can finish. Signing only the `release` repository makes "signed" also mean "passed the scan", so the cluster check covers both |
-| Signature check in the cluster | Kyverno + `kyverno-notation-aws` · Ratify + OPA Gatekeeper | **Kyverno** | Both are supported by AWS for Signer. Kyverno policies are plain Kubernetes YAML, and the same tool also enforces pod security; CNCF Graduated |
-| Pod access to AWS | Node IAM role · IRSA · **EKS Pod Identity** | **Pod Identity** | One IAM role per service account, set up without an OIDC provider per cluster; the newer AWS-recommended way |
+| Signature check in the cluster | Kyverno + `kyverno-notation-aws` · Kyverno's newer image policies · **Ratify + OPA Gatekeeper** | **Ratify + Gatekeeper** | AWS documents both Kyverno and Ratify for Signer. But Kyverno 1.20 (November 2026) removed the older policy type that `kyverno-notation-aws` needs, and Kyverno's newer image policies check Notary signatures against certificates only: they can't require *our* Signer profile (every AWS account's profiles chain to the same AWS root) or ask Signer about revocation. Ratify checks both; Gatekeeper (part of OPA, CNCF Graduated) also enforces the other policies |
+| Pod security | Gatekeeper policies · **Pod Security Admission** | **Pod Security Admission (`restricted`)** | Built into Kubernetes, so there is nothing to install or upgrade; one namespace label, set by Argo CD, covers non-root, privilege escalation, capabilities, and seccomp. Gatekeeper adds only what it lacks: a read-only root file system, digests, and limits |
+| When Gatekeeper itself is down | Fail closed (reject every request) · **fail open (the chart's default)** | **Fail open** | A closed webhook with no Gatekeeper pod running would block every change in the cluster, including the ones that would fix it. The audit reports anything admitted meanwhile, and two Gatekeeper replicas make an outage rare. If only Ratify is down, the signature policy still denies |
+| Pod access to AWS | Node IAM role · IRSA · **EKS Pod Identity** | **Pod Identity**, plus one IRSA role | One IAM role per service account, set up without an OIDC provider per cluster; the newer AWS-recommended way. The exception is Ratify: its ECR login reads only IRSA's settings (`AWS_ROLE_ARN`, `AWS_WEB_IDENTITY_TOKEN_FILE`), so it gets one IRSA role |
 | Web page | Separate frontend (S3 + CloudFront) · **one static page served by the app** | **Served by the app** | One image to scan, sign, and deploy, so the page gets the same release, signing, and rollback as the API; it calls the same REST API as `curl`; no extra AWS service (as in Architecture 02) |
 | Database | RDS / Aurora · **DynamoDB** | **DynamoDB (on demand)** | No servers or passwords: access is an IAM role through Pod Identity; pennies at lab scale; multi-AZ by design |
 | Outbound internet | NAT per AZ · **1 NAT** · VPC endpoints only | **1 NAT + free gateway endpoints (S3, DynamoDB)** | Argo CD must reach GitHub, so some internet access is needed. One NAT halves the cost for a lab; production uses one per AZ |
@@ -315,7 +330,7 @@ Numbered to match the arrows in the diagram.
 | Network isolation | None · Calico · **VPC CNI network policies** | **VPC CNI network policies** | Built into the EKS networking add-on; no extra component to run |
 | Cluster access | `aws-auth` ConfigMap · **EKS access entries** | **Access entries** | Managed through the EKS API and Terraform; the `aws-auth` ConfigMap is the older, error-prone method |
 | Environments | Namespaces in one cluster · **one cluster per account** | **Cluster per account (dev, stg, prd)** | A mistake in dev can't reach production; matches Architecture 02. The manifests share `base/` with an overlay per environment |
-| Infrastructure as code | eksctl · CloudFormation · Terraform | **Terraform** | Same tool and state layout as Architecture 02; one command to destroy everything |
+| Infrastructure as code | eksctl · CloudFormation · Terraform | **Terraform**, in layered stacks: network → cluster → platform | Each stack has its own state, so a change to the platform can't touch the VPC, and the Kubernetes providers connect only to a cluster that already exists. Community modules (`terraform-aws-modules` VPC, EKS, Pod Identity) for the standard parts, small modules of our own for the rest, and one codebase for every environment (only `environments/<env>/*.tfvars` differs). ECR managed signing isn't in the `aws` provider yet, so that one resource uses `awscc` |
 
 ## Security
 
@@ -330,16 +345,18 @@ Numbered to match the arrows in the diagram.
   `CODEOWNERS` makes every change except dev's version wait for a reviewer. Argo CD only reads the
   GitOps repository (public in the lab; through a read-only deploy key in production).
 - **Pods get only what they need through EKS Pod Identity:** the app can read and write its one
-  DynamoDB table; the load balancer controller can manage ELB resources; the Kyverno extension
-  can call Signer to verify signatures. Pods can't use the node's IAM role (IMDSv2 with a hop
-  limit of 1).
+  DynamoDB table; the load balancer controller can manage ELB resources. Ratify gets an IRSA role
+  that can read ECR and ask Signer about revocations. Pods can't use the node's IAM role (IMDSv2
+  with a hop limit of 1).
 - **Only scanned and signed images run.** Inspector gates `candidate` → `release`; ECR signs only
-  `release`; Kyverno rejects anything not signed by our Signer profile.
+  `release`; Gatekeeper, with Ratify, rejects any image not signed by our Signer profile or not
+  from `release`.
 - **Private nodes and a restricted API.** Nodes have no public IPs. The public API endpoint
   accepts only the admin's IP; cluster access is granted through EKS access entries.
-- **Inside the cluster:** default-deny NetworkPolicies, non-root pods with read-only root file
-  systems, quotas per namespace, and RBAC per namespace. Argo CD AppProjects let the `sample-web-app`
-  Application deploy only into `app-*` namespaces and create no cluster-wide objects.
+- **Inside the cluster:** default-deny NetworkPolicies, Pod Security Admission's `restricted`
+  level, read-only root file systems, quotas per namespace, and RBAC per namespace. Argo CD
+  AppProjects let the `sample-web-app` Application deploy only into `app-*` namespaces, with no
+  cluster-wide object except its own namespace.
 - **Encryption:** Kubernetes secrets with a KMS key; DynamoDB, ECR, and EBS volumes encrypted at
   rest.
 - **Secret scanning:** `gitleaks` runs on every push to the repository, with a rule that also
@@ -353,15 +370,17 @@ Numbered to match the arrows in the diagram.
 |---|---|---|
 | The tagged commit's image has a critical vulnerability | The release workflow stops at the scan check; nothing is released or deployed | Fix the dependency, push, and tag a new version |
 | A version tag points at a commit that was never built | The release workflow finds no `candidate` image and stops | Tag a commit that the CI workflow built |
-| Someone deploys an unsigned image (by hand, or from another registry) | Kyverno rejects the pod; the running pods are untouched | Deploy through the pipeline |
+| Someone deploys an unsigned image (by hand, or from another registry) | Gatekeeper rejects the pod; the running pods are untouched | Deploy through the pipeline |
+| Ratify is down | New app pods are rejected, because their signatures can't be checked; running pods keep serving | Kubernetes restarts Ratify; the Deployment then creates the pods |
+| Gatekeeper is down | New pods are admitted without Gatekeeper's checks (it fails open); Pod Security Admission still applies | Kubernetes restarts it; the audit then reports any pod that breaks a policy |
 | A pod crashes | The other replicas keep serving; the load balancer stops sending to it | Kubernetes restarts it; the Deployment keeps the replica count |
 | A node fails | Pods on the other node keep serving (they are spread across AZs) | The managed node group replaces the node; pods are rescheduled |
 | An AZ fails (not the NAT's AZ) | The other AZ's pods keep serving | As above, once the AZ is back |
 | The NAT gateway's AZ fails | Running pods keep serving and DynamoDB still works (gateway endpoint), but Argo CD can't reach GitHub and new images can't be pulled | Wait for the AZ, or (production) one NAT per AZ |
 | A bad release passes the scan and the health checks | Users get the broken version | Set the previous version back in the overlay (pull request); Argo CD deploys its signed digest |
 | Someone changes the cluster by hand | Drift from Git | Argo CD self-heal puts it back |
-| A broken platform change (for example a bad Kyverno policy) | Only that namespace's Application shows Degraded; the `sample-web-app` Application keeps its own sync and health | Revert the change in Git |
-| The GitHub App's private key leaks | Someone can open pull requests in `eks-platform-gitops`, but only dev's version merges without review, and Kyverno still rejects any image we didn't sign | Revoke the key in the App's settings and create a new one |
+| A broken platform change (for example a bad Gatekeeper policy) | Only that namespace's Application shows Degraded; the `sample-web-app` Application keeps its own sync and health | Revert the change in Git |
+| The GitHub App's private key leaks | Someone can open pull requests in `eks-platform-gitops`, but only dev's version merges without review, and Gatekeeper still rejects any image we didn't sign | Revoke the key in the App's settings and create a new one |
 | EKS version upgrade | Nodes must be replaced | Upgrade the control plane, then roll the node group (one node at a time; the PDB keeps the app up) |
 
 **Backups:** DynamoDB point-in-time recovery (35 days). Git holds the source and every manifest,
@@ -388,7 +407,7 @@ Approximate on-demand prices in `ap-northeast-1`; check the
 | Amazon Inspector | ~$0.09 per image scan, ~$0.01 per rescan (15-day free trial for new accounts) |
 | AWS Signer (via ECR managed signing) | No additional charge |
 | DynamoDB (on demand), ECR, gateway endpoints | Cents per month at lab scale; gateway endpoints are free |
-| Argo CD, Kyverno, metrics-server, GitHub Actions | $0 (open source; Actions is free for public repositories) |
+| Argo CD, Gatekeeper, Ratify, metrics-server, GitHub Actions | $0 (open source; Actions is free for public repositories) |
 | **Total while running (dev)** | **~$0.33 per hour (~$8–9 per day)**, plus about $1 of scans per lab run |
 
 The biggest cost drivers are the EKS control plane, the two nodes, and the NAT gateway; all are
@@ -404,6 +423,9 @@ the lab and `terraform destroy` on the same day.
 - **Observability:** Prometheus and Grafana (or CloudWatch Container Insights) for metrics, and
   Fluent Bit for logs.
 - **Progressive delivery:** Argo Rollouts for canary releases that stop on error metrics.
+- **Fail closed for the app namespaces:** make Gatekeeper's webhook reject what it can't check,
+  but only for `app-*`, so an outage can neither let an unchecked app pod in nor block the
+  system namespaces.
 - **Private repositories:** make `eks-platform-gitops` private, with Argo CD reading it through
   a read-only deploy key, and require two reviewers for `overlays/prd`.
 - **Backup and disaster recovery:** Velero for cluster resources, and a tested rebuild runbook.
