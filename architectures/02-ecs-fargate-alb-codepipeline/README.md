@@ -12,8 +12,9 @@
 - **Functional**
   - Users reach the web app over HTTP through a single public endpoint (the ALB DNS name).
   - Users can store data and later retrieve or update it through a small REST API (create,
-    list, get, update items). The data lives in a MySQL-compatible database and survives task
-    restarts and deployments.
+    list, get, update items), or through a web page that shows the items in a table and calls
+    that API. The data lives in a MySQL-compatible database and survives task restarts and
+    deployments.
   - A push to `main` that changes the app builds a new image and deploys it to ECS with no
     manual steps.
   - A broken release is rolled back automatically.
@@ -114,8 +115,9 @@ Numbered to match the arrows in the diagram.
 | GitHub connection | Personal access token · CodeConnections | **CodeConnections** | No GitHub token stored in AWS; access is granted through a GitHub App |
 | Image tag | `latest` · commit ID | **Commit ID** (immutable tags in ECR) | Every running task traces to a commit; a tag can never be overwritten |
 | App runtime | Python · Node.js · Java 25 (Spring Boot) | **Java 25 + Spring Boot on Amazon Corretto** | The common enterprise stack; Corretto is AWS's own OpenJDK build; Java 25 is the current LTS |
+| Web page | Separate frontend (S3 + CloudFront) · template engine (Thymeleaf) · one static HTML file served by the app | **One static HTML file served by Spring Boot** | Shows the data in a browser with no extra AWS service, library, or build step; it calls the same REST API as `curl`, and ships in the same image, so a deploy updates both |
 | Base images | Docker Hub · ECR Public | **ECR Public** (Maven + Corretto 25 to build, Corretto 25 headless to run) | Avoids Docker Hub rate limits on CodeBuild's shared IP addresses |
-| Environments | Workspaces in one account · separate accounts per environment | **Separate accounts (dev, stg, prd)** | A mistake in dev can't reach production; separate bills and permissions; Terraform refuses the wrong account |
+| Environments | Workspaces in one account · separate accounts per environment | **Separate accounts (dev, stg, prd)** | A mistake in dev can't reach production; separate bills and permissions. No account ID in the code: Terraform reads it from the login, and with the wrong login `terraform init` finds no state bucket and stops |
 | Deployment safety | Plain rolling update · rolling update with circuit breaker · blue/green (CodeDeploy) | **Rolling update with circuit breaker** | Automatic rollback of a failed release with no extra service; blue/green is a later improvement |
 | Infrastructure as code | Console · CloudFormation · Terraform | **Terraform** | Repeatable, reviewable, and one command to destroy everything |
 | Terraform layout | One `main.tf` · code copied per environment · workspaces · reusable modules · Terragrunt | **One root configuration: `<service>.tf` + `<service>_local.tf`, `env/<env>/`** | One codebase for every environment (no drift), settings separated from resource code, no extra tools; modules become worth it once several apps reuse the platform ([details](../../labs/aws/01-ecs-fargate-alb-codepipeline/README.md#why-this-structure)) |
@@ -136,7 +138,8 @@ Numbered to match the arrows in the diagram.
   in Secrets Manager; GitHub access goes through CodeConnections instead of a stored token.
 - **Encryption:** Aurora storage, the artifact bucket, ECR, and the secret are encrypted at
   rest; the S3 buckets block all public access, and their bucket policies refuse any request that is not HTTPS.
-- **Container hardening:** the app runs as a non-root user.
+- **Container hardening:** the container's root file system is read-only; only `/tmp` is
+  writable. The app runs as root, because Fargate mounts that `/tmp` volume owned by root.
 - **Secret scanning:** `gitleaks` runs on every push to the repository.
 
 ## Scaling and reliability
@@ -195,5 +198,7 @@ charged per hour even with no traffic. Run the lab and `terraform destroy` on th
 - **Release promotion:** a manual approval stage and cross-account deploys, so one release moves
   dev → stg → prd instead of each environment building its own branch.
 - **Least-privilege database user:** an app-only MySQL user instead of the master user.
+- **Non-root container:** run the app as a normal user, and give it `/tmp` by declaring
+  `VOLUME ["/tmp"]` in the Dockerfile so Fargate copies the folder's owner to the volume.
 - **Smaller runtime:** a custom Java runtime built with `jlink`, instead of the full Corretto image.
 - **Alerting:** send the CloudWatch alarms to SNS (email or chat).

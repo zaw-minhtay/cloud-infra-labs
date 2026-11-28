@@ -18,7 +18,8 @@ platform from code.
 
 At the end of the lab:
 
-- Users store items and later retrieve or update them through a REST API at the ALB address.
+- Users store items and later retrieve or update them at the ALB address, through a web page
+  (a table of the items) or the REST API behind it.
 - Two tasks run in two Availability Zones; stopping one, or failing over Aurora, doesn't take the
   app down.
 - The tasks and the database have no internet route; they reach AWS only through VPC endpoints.
@@ -76,10 +77,10 @@ Design details, decisions, and trade-offs are in the
 labs/aws/01-ecs-fargate-alb-codepipeline/
 ├── README.md                this overview
 ├── SETUP.md                 step-by-step guide (index) → setup/1-prepare.md … 5-clean-up.md
-├── app/                     Java 25 Spring Boot API
+├── app/                     Java 25 Spring Boot API + web page
 │   ├── pom.xml
 │   ├── Dockerfile           Maven build stage + Corretto 25 runtime stage
-│   └── src/                 controller, repository, schema.sql, tests
+│   └── src/                 controller, repository, schema.sql, static/index.html (web page), tests
 └── terraform/
     ├── versions.tf          Terraform, provider, S3 backend
     ├── variables.tf         inputs set per environment
@@ -136,9 +137,9 @@ Why the chosen layout works well:
   `<service>.tf` stays the same, so reviews are short and low-risk.
 - **Names in one place.** All names come from `local.name_prefix`, so the naming rule is applied
   the same way everywhere and can be checked in one pass.
-- **Safe across accounts.** Each environment has its own `backend.hcl` (its own state bucket in its
-  own account), and `allowed_account_ids` stops Terraform if the credentials point at the wrong
-  account.
+- **Safe across accounts, with no account ID in the code.** The account comes from your AWS
+  login, and each environment's state bucket name contains its account ID, so with the wrong
+  login `terraform init` finds no state and stops.
 - **No extra tools.** Plain Terraform and the AWS provider only.
 
 Trade-offs, honestly:
@@ -205,18 +206,31 @@ Everything is separate per environment: account, state bucket, network, pipeline
 | Deletion protection | off | off | **on** |
 | `force_destroy` (final snapshot, non-empty buckets) | yes | yes | **no** |
 
-Two safety checks keep environments apart:
-- The AWS provider has `allowed_account_ids = [account_id]`, so Terraform refuses to run if your
-  credentials point at another environment's account.
-- Each environment has its own `backend.hcl`, so its state can never be mixed with another's.
+No file holds an AWS account ID: Terraform reads it from your AWS login
+(`data.aws_caller_identity`). What keeps environments apart:
+- **Your login picks the account.** Each environment has its own AWS CLI profile; check it with
+  `aws sts get-caller-identity` before running Terraform.
+- **The state bucket name contains the account ID**, and `terraform init` builds that name from
+  your login. With the wrong login, `init` looks for a bucket that doesn't exist in that account
+  and stops.
+- Each environment has its own `backend.hcl` (its own state key), so its state can never be
+  mixed with another's.
+
+Trade-off: an earlier version pinned the account with the provider's `allowed_account_ids`,
+which needs the ID written in a file. Without it, the one unguarded step is the bootstrap
+(step 7): with the wrong login it would create a state bucket in that account. Check
+`aws sts get-caller-identity` first.
 
 **To deploy stg or prd** (same steps as the guide, with that environment's files):
 
 ```bash
 export AWS_PROFILE=<your-stg-profile>
-# replace the placeholders in env/stg/terraform.tfvars and env/stg/backend.hcl (like step 6)
+aws sts get-caller-identity --query Account --output text   # must be your stg account
+# replace the GitHub placeholder in env/stg/terraform.tfvars (like step 6)
 cd terraform/bootstrap && terraform init && terraform apply -var-file=../env/stg/terraform.tfvars && cd ..
-terraform init -reconfigure -backend-config=env/stg/backend.hcl
+ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
+terraform init -reconfigure -backend-config=env/stg/backend.hcl \
+  -backend-config="bucket=awslab01-stg-s3-tfstate-${ACCOUNT_ID}-ap-northeast-1"
 terraform apply -var-file=env/stg/terraform.tfvars -var app_desired_count=0
 ```
 
@@ -230,6 +244,7 @@ so promoting a release means merging `main` into `release/stg` (and later into `
 | Problem | Cause | Fix |
 |---|---|---|
 | The unit tests for `POST /items` returned `503` instead of `201` | After the `INSERT`, the code asked for the generated keys. The H2 test database returned two (`id` and the defaulted `updated_at`), so Spring couldn't pick the ID; the error handler turned that into 503 | Ask for the `id` column only: `.update(keys, "id")`. Verified against H2 in the tests and against real MySQL 8.0 |
+| On Fargate the tasks exited with code 1 (`Unable to start web server`) and the target group showed them unhealthy; the same image worked locally | The task's root file system is read-only and `/tmp` is a Fargate volume, which is owned by root (`0755`). The app ran as `USER 10001`, so Tomcat couldn't write its temp folder in `/tmp`. Locally there is no read-only file system or volume, so `/tmp` was writable | Removed `USER 10001` from the Dockerfile, so the app runs as root and can write `/tmp`; both targets became healthy. Running as non-root again is listed in the architecture's improvements |
 
 ## Cost
 

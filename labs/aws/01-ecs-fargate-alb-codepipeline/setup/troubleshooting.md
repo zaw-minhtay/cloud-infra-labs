@@ -8,11 +8,10 @@ Run the commands from the `terraform/` folder with `AWS_PROFILE` set.
 
 | Problem | Cause | Fix |
 |---|---|---|
-| `account_id must be your 12-digit AWS account ID` | A placeholder is still in `env/dev/terraform.tfvars` | Run step 6 again |
 | `Set github_repository to your own owner/name` | The GitHub placeholder is still in `env/dev/terraform.tfvars` | Run step 6 again |
-| `AWS account ID not allowed` | `AWS_PROFILE` points at a different account than `account_id` in the tfvars | `export AWS_PROFILE=<your-dev-profile>`, then `aws sts get-caller-identity` |
+| `Value for undeclared variable "account_id"` | Your `terraform.tfvars` is from an older version of this lab, which had an `account_id` line | Delete that line: the account now comes from your AWS login |
 | `No valid credential sources found` / `ExpiredToken` | Not signed in, or the session expired | Sign in again (step 2) |
-| `terraform init`: `S3 bucket ... does not exist` | The state bucket wasn't created, or its name doesn't match `backend.hcl` | Run step 7; compare `state_bucket` with `bucket` in `env/dev/backend.hcl` |
+| `terraform init`: `S3 bucket ... does not exist` | You're logged in to a different account than the one with the state bucket, or the bucket wasn't created | `aws sts get-caller-identity`: if it's the wrong account, `export AWS_PROFILE=<your-dev-profile>`; otherwise run step 7. Compare `state_bucket` from step 7 with the bucket name in step 8 |
 | `Error acquiring the state lock` | An earlier run was interrupted | Wait for other runs to finish; then `terraform force-unlock <lock-id>` with the ID from the error |
 
 ## Pipeline
