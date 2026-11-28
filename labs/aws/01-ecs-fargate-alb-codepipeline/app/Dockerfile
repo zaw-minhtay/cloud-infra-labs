@@ -23,7 +23,5 @@ ENV APP_VERSION=${APP_VERSION} \
 WORKDIR /app
 COPY --from=build /src/target/items-api.jar app.jar
 
-# Run as a non-root user. This is the only place the user is set (ECS uses the image default).
-USER 10001
 EXPOSE 8080
 ENTRYPOINT ["java", "-jar", "/app/app.jar"]
