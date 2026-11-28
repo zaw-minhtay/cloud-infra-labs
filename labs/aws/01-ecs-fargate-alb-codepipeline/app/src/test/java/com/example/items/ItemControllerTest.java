@@ -44,8 +44,8 @@ class ItemControllerTest {
     }
 
     @Test
-    void rootShowsVersion() throws Exception {
-        mvc.perform(get("/")).andExpect(status().isOk()).andExpect(jsonPath("$.version").value("test"));
+    void infoShowsVersion() throws Exception {
+        mvc.perform(get("/info")).andExpect(status().isOk()).andExpect(jsonPath("$.version").value("test"));
     }
 
     @Test

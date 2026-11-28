@@ -15,7 +15,8 @@ import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
 /**
- * GET  /              app name and version (the Git commit ID set by CodeBuild)
+ * GET  /              web page (src/main/resources/static/index.html, served by Spring Boot)
+ * GET  /info          app name and version (the Git commit ID set by CodeBuild)
  * GET  /healthz       "ok" for the ALB health check; does NOT touch the database
  * GET  /items         list all items
  * POST /items         create an item
@@ -33,7 +34,7 @@ public class ItemController {
         this.version = version;
     }
 
-    @GetMapping("/")
+    @GetMapping("/info")
     public Map<String, String> info() {
         return Map.of("app", "items-api", "version", version);
     }
