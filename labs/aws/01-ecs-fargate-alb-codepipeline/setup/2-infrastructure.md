@@ -79,7 +79,7 @@ Check the bucket:
 **Via CLI:** the `state_bucket` output above.
 
 The bootstrap keeps its own small state file locally (`bootstrap/terraform.tfstate`, git-ignored).
-Keep it until [step 23](5-clean-up.md#23-delete-the-state-bucket).
+Keep it until [step 24](5-clean-up.md#24-delete-the-state-bucket).
 
 ## 8. Connect Terraform to the state bucket
 

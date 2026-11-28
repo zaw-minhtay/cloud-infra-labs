@@ -56,4 +56,4 @@ aws logs tail /ecs/awslab01-dev/app --since 15m
 |---|---|---|
 | `terraform destroy` fails on the ECR repository or S3 bucket | `force_destroy` is `false` (stg/prd settings) | In dev it is `true`; for other envs empty them first |
 | `terraform destroy` fails on Aurora or the ALB: deletion protection | `deletion_protection = true` (prd) | Expected for prd; set it to `false`, apply, then destroy |
-| Step 25 still lists resources | AWS is still finishing the deletions | Wait a few minutes and run it again |
+| Step 26 still lists resources | The tag index updates later than the resources, or AWS is still finishing the deletions | Wait a few minutes and run it again. If `awslab01-dev-task-app` revisions are listed, do step 23 |

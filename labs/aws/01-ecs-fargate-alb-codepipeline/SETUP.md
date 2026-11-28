@@ -16,7 +16,7 @@ This guide is long, so it is split into parts. Step numbers continue from one pa
 | [2. Infrastructure](setup/2-infrastructure.md) | 6–10 | Fill in your values, create the state bucket, and build everything with Terraform |
 | [3. Pipeline](setup/3-pipeline.md) | 11–15 | Connect GitHub, run the pipeline, start the tasks, use the app, deploy a change |
 | [4. Verify](setup/4-verify.md) | 16–21 | Prove HA and safety: two AZs, no internet route, task failure, Aurora failover, rollback, alarms |
-| [5. Clean up](setup/5-clean-up.md) | 22–25 | Delete everything, including the state bucket and the GitHub access |
+| [5. Clean up](setup/5-clean-up.md) | 22–27 | Delete everything, including the task definitions, the state bucket, and the GitHub access; put your repo back |
 | [Troubleshooting](setup/troubleshooting.md) | — | Common errors and how to fix them |
 
 > ⚠️ **This lab costs money.** Parts 2–4 run real AWS resources: about **$0.43 per hour

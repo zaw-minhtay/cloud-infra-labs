@@ -190,4 +190,7 @@ curl -s $APP_URL/items
 
 Expected: `{"version":"<new-commit-id>","app":"items-api-v2"}`, and both items from step 14.
 
+This change stays in your `main` until [step 27](5-clean-up.md#27-put-your-repository-back)
+puts the name back.
+
 Next: [Part 4 — Verify →](4-verify.md)

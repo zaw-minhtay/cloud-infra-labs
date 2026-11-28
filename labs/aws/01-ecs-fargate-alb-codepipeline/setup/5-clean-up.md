@@ -1,9 +1,10 @@
-# Part 5 — Clean up (steps 22–25)
+# Part 5 — Clean up (steps 22–27)
 
 [← Part 4](4-verify.md) · [Guide index](../SETUP.md)
 
-Delete everything this lab created, so nothing keeps costing money or holding access.
-Run the CLI commands from the `terraform/` folder with `AWS_PROFILE` set (step 2).
+Delete everything this lab created, so nothing keeps costing money or holding access, and put
+your repository back the way it started. Run the CLI commands from the `terraform/` folder with
+`AWS_PROFILE` set (step 2).
 
 ## 22. Destroy the dev environment
 
@@ -29,7 +30,44 @@ Check the main pieces are gone:
 
 **Via CLI:** the `Destroy complete!` line above.
 
-## 23. Delete the state bucket
+## 23. Delete the task definitions
+
+Every pipeline run registers a new **task definition revision** (`awslab01-dev-task-app:2`,
+`:3`, …). Terraform only knows revision 1, so `destroy` leaves the others. They cost nothing,
+but they are still left in your account. Deleting one takes two actions: **deregister** it
+(it becomes inactive), then **delete** it.
+
+**Via console:** **ECS** → **Task definitions** → **awslab01-dev-task-app**.
+1. Select every **Active** revision → **Actions** → **Deregister**, and confirm.
+2. Show the **Inactive** revisions, select all of them → **Actions** → **Delete**, and confirm.
+
+**Via CLI:**
+
+```bash
+for td in $(aws ecs list-task-definitions --family-prefix awslab01-dev-task-app --status ACTIVE --query "taskDefinitionArns[]" --output text); do
+  aws ecs deregister-task-definition --task-definition "$td" --query "taskDefinition.revision" --output text
+done
+aws ecs delete-task-definitions --query "failures[].reason" --output text \
+  --task-definitions $(aws ecs list-task-definitions --family-prefix awslab01-dev-task-app --status INACTIVE --query "taskDefinitionArns[]" --output text)
+```
+
+Expected: the loop prints the revision numbers it deregistered (`2`, `3`, …), and the delete
+prints nothing (no failures).
+
+Check:
+
+**Via console:** **ECS** → **Task definitions**. Expected: no `awslab01-dev-task-app` (or no
+revisions left in it).
+
+**Via CLI:**
+
+```bash
+aws ecs list-task-definitions --family-prefix awslab01-dev-task-app --output text
+```
+
+Expected: no output.
+
+## 24. Delete the state bucket
 
 Only after step 22 succeeded: the bucket holds the state Terraform needed to destroy. CLI only:
 
@@ -49,7 +87,7 @@ Check:
 
 **Via CLI:** the `Destroy complete!` line above.
 
-## 24. Remove the GitHub access
+## 25. Remove the GitHub access
 
 The connection was deleted in step 22, but the GitHub app is still installed on your account.
 This is done on the GitHub website:
@@ -60,7 +98,7 @@ This is done on the GitHub website:
 
 Expected: **AWS Connector for GitHub** is no longer listed.
 
-## 25. Check nothing is left
+## 26. Check nothing is left
 
 **Via console:** **Resource Groups & Tag Editor** → **Tag Editor**. Choose region
 **ap-northeast-1**, resource types **All supported resource types**, and the tags
@@ -77,14 +115,26 @@ aws resourcegroupstaggingapi get-resources \
 
 Expected: no output.
 
-Right after deleting, a few resources can still appear for some minutes while AWS finishes;
-check again later.
+This search reads AWS's tag index, which updates later than the resources themselves. Right
+after deleting, resources that are already gone (VPC endpoints, security group rules, the ECS
+cluster) can still be listed for a while; check again later.
 
-Finally, put the GitHub placeholder back so your username never gets committed (git, CLI only):
+## 27. Put your repository back
+
+Step 15 pushed `items-api-v2` to your `main`, and your local `terraform.tfvars` holds your
+GitHub username. Put both back, so the next run of the lab starts the same way (git, CLI only):
 
 ```bash
-git checkout -- env/dev/
-git status --short env/
+cd ..
+sed -i '' 's/"app", "items-api-v2"/"app", "items-api"/' app/src/main/java/com/example/items/ItemController.java
+git add app/src/main/java/com/example/items/ItemController.java
+git commit -m "chore(aws): put the app name back after the lab"
+git push
+git checkout -- terraform/env/dev/
+git status --short
+cd terraform
 ```
 
-Expected: `git status` shows no changes under `env/`.
+The pipeline was deleted in step 22, so this push doesn't deploy anything.
+
+Expected: `git status` shows no changes (nothing under `app/` or `terraform/env/`).
