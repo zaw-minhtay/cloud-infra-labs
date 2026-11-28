@@ -1,8 +1,8 @@
 # stg: same shape as prd, but smaller and destroyable. Lives in its own AWS account.
-# Replace the two placeholders before deploying stg.
+# Replace the GitHub placeholder before deploying stg. The AWS account comes from your AWS
+# login (the stg profile), so no account ID is written here.
 
-env        = "stg"
-account_id = "REPLACE_WITH_STG_ACCOUNT_ID" # your stg AWS account (12 digits)
+env = "stg"
 
 vpc_cidr            = "10.1.0.0/16"
 public_subnet_cidrs = ["10.1.0.0/24", "10.1.1.0/24"]

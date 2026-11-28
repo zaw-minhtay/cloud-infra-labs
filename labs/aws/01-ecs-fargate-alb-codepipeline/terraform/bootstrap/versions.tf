@@ -14,8 +14,7 @@ terraform {
 }
 
 provider "aws" {
-  region              = var.region
-  allowed_account_ids = [var.account_id]
+  region = var.region
 
   default_tags {
     tags = {
@@ -25,3 +24,6 @@ provider "aws" {
     }
   }
 }
+
+# The account comes from your AWS login; no account ID is written in any file.
+data "aws_caller_identity" "current" {}

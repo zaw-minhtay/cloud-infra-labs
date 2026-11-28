@@ -1,8 +1,8 @@
 # dev: lowest cost, everything can be destroyed. Deployed by this lab (setup/2-infrastructure.md).
-# Replace the two placeholders before the first `terraform plan`.
+# Replace the GitHub placeholder before the first `terraform plan`. The AWS account comes from
+# your AWS login, so no account ID is written here.
 
-env        = "dev"
-account_id = "REPLACE_WITH_DEV_ACCOUNT_ID" # your dev AWS account (12 digits)
+env = "dev"
 
 vpc_cidr            = "10.0.0.0/16"
 public_subnet_cidrs = ["10.0.0.0/24", "10.0.1.0/24"]

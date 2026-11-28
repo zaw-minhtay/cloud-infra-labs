@@ -1,8 +1,8 @@
 # prd: bigger tasks and database, longer backups and logs, protected from deletion.
-# Lives in its own AWS account. Replace the two placeholders before deploying prd.
+# Lives in its own AWS account. Replace the GitHub placeholder before deploying prd. The AWS
+# account comes from your AWS login (the prd profile), so no account ID is written here.
 
-env        = "prd"
-account_id = "REPLACE_WITH_PRD_ACCOUNT_ID" # your prd AWS account (12 digits)
+env = "prd"
 
 vpc_cidr            = "10.2.0.0/16"
 public_subnet_cidrs = ["10.2.0.0/24", "10.2.1.0/24"]

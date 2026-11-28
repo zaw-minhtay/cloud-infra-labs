@@ -16,16 +16,6 @@ variable "env" {
   }
 }
 
-variable "account_id" {
-  description = "The AWS account ID of this environment"
-  type        = string
-
-  validation {
-    condition     = can(regex("^[0-9]{12}$", var.account_id))
-    error_message = "account_id must be your 12-digit AWS account ID. Edit env/<env>/terraform.tfvars."
-  }
-}
-
 variable "region" {
   description = "AWS region"
   type        = string

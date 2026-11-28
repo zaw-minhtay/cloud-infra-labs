@@ -16,13 +16,10 @@ terraform {
 provider "aws" {
   region = var.region
 
-  # Each environment lives in its own AWS account. This makes Terraform refuse to run if your
-  # credentials point at a different account than the one in env/<env>/terraform.tfvars.
-  allowed_account_ids = [var.account_id]
-
   default_tags {
     tags = local.common_tags
   }
 }
 
+# The account comes from your AWS login; no account ID is written in any file.
 data "aws_caller_identity" "current" {}
