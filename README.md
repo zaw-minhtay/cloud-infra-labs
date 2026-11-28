@@ -12,7 +12,7 @@ System designs: diagram, decisions, trade-offs, and cost.
 |---|---|---|---|
 | 01 | [GitOps Pipeline with GitHub Actions and Argo CD on Local Kubernetes](architectures/01-gitops-github-actions-argocd/README.md) | Pull-based GitOps: CI builds and publishes images, Argo CD deploys from Git; failure handling, security, and trade-offs | [ci-cd/01](labs/ci-cd/01-gitops-github-actions-argocd/README.md) |
 | 02 | [ECS Fargate Service behind an ALB with CodePipeline](architectures/02-ecs-fargate-alb-codepipeline/README.md) | Highly available ALB + ECS Fargate (one task per AZ) with Aurora MySQL, all in private subnets with VPC endpoints (no NAT); CodePipeline + CodeBuild deploy on every push; Terraform | [aws/01](labs/aws/01-ecs-fargate-alb-codepipeline/README.md) |
-| 03 | [GitOps Platform on EKS with Image Scanning and Signing](architectures/03-eks-gitops-image-scanning-signing/README.md) | Private EKS across 2 AZs; app code and GitOps config in separate repos; Argo CD deploys one Application per namespace; a version tag releases only images Amazon Inspector passed, ECR signs them with AWS Signer, and Kyverno admits only signed images; DynamoDB through Pod Identity; Terraform | Planned: kubernetes/01 |
+| 03 | [GitOps Platform on EKS with Image Scanning and Signing](architectures/03-eks-gitops-image-scanning-signing/README.md) | Private EKS across 2 AZs; app code and GitOps config in separate repos; Argo CD deploys one Application per namespace; a version tag releases only images Amazon Inspector passed, ECR signs them with AWS Signer, and Gatekeeper with Ratify admits only signed images; DynamoDB through Pod Identity; Terraform | [kubernetes/01](labs/kubernetes/01-eks-gitops-image-scanning-signing/README.md) |
 
 ## Labs
 
@@ -22,6 +22,7 @@ Hands-on builds, grouped by the main skill they practise.
 |---|---|---|---|---|
 | aws | 01 | [ECS Fargate Service behind an ALB with CodePipeline](labs/aws/01-ecs-fargate-alb-codepipeline/README.md) | Java 25 Spring Boot API on 2 Fargate tasks across 2 AZs behind an ALB, Aurora MySQL, private subnets with VPC endpoints; CodePipeline deploys on every push; task-failure, failover, and rollback tests | Terraform, ECS Fargate, ALB, Aurora MySQL, CodePipeline, CodeBuild, ECR, Java 25 |
 | ci-cd | 01 | [GitOps Pipeline with GitHub Actions and Argo CD on Local Kubernetes](labs/ci-cd/01-gitops-github-actions-argocd/README.md) | Every push is tested, built for arm64 + amd64, published to GHCR, and deployed by Argo CD; self-heal and Git rollback | GitHub Actions, GHCR, Argo CD, Kubernetes (kind), Kustomize, Docker |
+| kubernetes | 01 | [GitOps Platform on EKS with Image Scanning and Signing](labs/kubernetes/01-eks-gitops-image-scanning-signing/README.md) | Private EKS across 2 AZs; a version tag releases only images Inspector passed, ECR signs them with AWS Signer, Argo CD deploys from a separate GitOps repo, and Gatekeeper with Ratify refuses unsigned images; Log4Shell scan-gate, self-heal, and rollback tests | Terraform, EKS, Argo CD, OPA Gatekeeper, Ratify, Amazon Inspector, AWS Signer, ECR, GitHub Actions, DynamoDB, Java 25 |
 
 ## Notes
 

@@ -1,0 +1,33 @@
+# A test pod for step 20 of the guide: it follows every rule of the app-dev namespace (non-root,
+# read-only root file system, CPU and memory limits, image by digest), so the only thing that
+# decides whether it is allowed is its IMAGE: signed, and from the release repository, or not.
+#
+# Used only with `kubectl apply --dry-run=server`: the API server runs every admission check,
+# including Gatekeeper and Ratify, but creates nothing. IMAGE is replaced by the guide's command.
+apiVersion: v1
+kind: Pod
+metadata:
+  name: admission-test
+  namespace: app-dev
+spec:
+  securityContext:
+    runAsNonRoot: true
+    runAsUser: 10001
+    runAsGroup: 10001
+    seccompProfile:
+      type: RuntimeDefault
+  containers:
+    - name: app
+      image: IMAGE
+      securityContext:
+        allowPrivilegeEscalation: false
+        readOnlyRootFilesystem: true
+        capabilities:
+          drop: ["ALL"]
+      resources:
+        requests:
+          cpu: 100m
+          memory: 384Mi
+        limits:
+          cpu: "1"
+          memory: 512Mi
