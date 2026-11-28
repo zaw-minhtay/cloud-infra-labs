@@ -16,9 +16,9 @@
   - Users store items and later retrieve or update them through a small REST API (create, list,
     get, update) at the load balancer's address. The data lives in DynamoDB and survives pod
     restarts and deployments.
-  - A push to `main` in the app repository (`items-api`) tests the app, builds an image, and
+  - A push to `main` in the app repository (`sample-web-app`) tests the app, builds an image, and
     scans it. **It deploys nothing.**
-  - **A version tag releases:** pushing a tag such as `v1.2.0` in `items-api` turns that
+  - **A version tag releases:** pushing a tag such as `v1.2.0` in `sample-web-app` turns that
     commit's image into release `1.2.0` and deploys it to dev through the GitOps repository
     (`eks-platform-gitops`, pull-based GitOps), with no other manual steps. Promoting to stg or
     prd is a reviewed pull request in the GitOps repository that sets the same version in that
@@ -73,12 +73,12 @@ Both are pages of [diagram.drawio](./diagram.drawio). The numbers match
 
 | Component | Tool | What it does |
 |---|---|---|
-| App repository | GitHub: `items-api` | The app's code, Dockerfile, tests, and its CI and release workflows. Tags such as `v1.2.0` are the app's versions. |
+| App repository | GitHub: `sample-web-app` | The app's code, Dockerfile, tests, and its CI and release workflows. Tags such as `v1.2.0` are the app's versions. |
 | GitOps repository | GitHub: `eks-platform-gitops` | Argo CD objects (`apps/`) and Kubernetes manifests (`manifests/`, Kustomize overlays per environment). Argo CD reads only this repository. |
-| CI workflow | GitHub Actions in `items-api` (on push to `main`) | Tests and builds the image, tags it with the commit ID, and pushes it to `candidate` for scanning. Deploys nothing. |
-| Release workflow | GitHub Actions in `items-api` (on a `v*` tag) | Checks the tagged commit's scan result, copies the image to `release` as the version (`1.2.0`, same digest), creates a GitHub Release, and opens a pull request in the GitOps repository that sets the version and digest in the dev overlay; it merges automatically. |
+| CI workflow | GitHub Actions in `sample-web-app` (on push to `main`) | Tests and builds the image, tags it with the commit ID, and pushes it to `candidate` for scanning. Deploys nothing. |
+| Release workflow | GitHub Actions in `sample-web-app` (on a `v*` tag) | Checks the tagged commit's scan result, copies the image to `release` as the version (`1.2.0`, same digest), creates a GitHub Release, and opens a pull request in the GitOps repository that sets the version and digest in the dev overlay; it merges automatically. |
 | Release access to the GitOps repository | GitHub App | Gives the release workflow a one-hour token that can push a branch and open pull requests in `eks-platform-gitops` only. |
-| CI access to AWS | IAM OIDC provider for GitHub | Gives each workflow short-lived credentials for one IAM role, limited to the `items-api` repository (its `main` branch for CI, its `v*` tags for releases). No AWS keys are stored in GitHub. |
+| CI access to AWS | IAM OIDC provider for GitHub | Gives each workflow short-lived credentials for one IAM role, limited to the `sample-web-app` repository (its `main` branch for CI, its `v*` tags for releases). No AWS keys are stored in GitHub. |
 | Image registry | Amazon ECR (2 repositories) | `candidate`: every build, tagged with its commit ID, scanned on push. `release`: only released versions (`1.2.0`) that passed the scan; signed; tags are immutable, so a version can't be overwritten. |
 | Vulnerability scanning | Amazon Inspector (ECR enhanced scanning) | Scans each image on push for OS and language-package vulnerabilities, and rescans when a new CVE affects it. |
 | Image signing | AWS Signer (ECR managed signing) | Signs each image pushed to the `release` repository automatically, using a Signer signing profile. Signatures are stored in ECR next to the image. |
@@ -91,7 +91,7 @@ Both are pages of [diagram.drawio](./diagram.drawio). The numbers match
 | Pod access to AWS | EKS Pod Identity (Pod Identity Agent add-on) | Maps a Kubernetes service account to one IAM role: the app to its DynamoDB table, the load balancer controller to ELB APIs. |
 | Other EKS add-ons | CoreDNS, kube-proxy, EBS CSI driver | Cluster DNS, service routing, and volumes (managed by EKS). |
 | GitOps controller | Argo CD | Runs in the cluster, pulls from the GitOps repository, and keeps the cluster matching it (sync and self-heal). App-of-apps: one root Application creates the others. AppProjects limit what each group of Applications may deploy, and where. |
-| One Application per namespace | Argo CD ApplicationSets (cluster generator) | Create one Application per namespace (`argocd`, `kyverno`, `platform`, `items-api`) and fill in each cluster's own values from its annotations, which Terraform sets: ECR registry, Signer profile ARN, cluster name, VPC ID. Nothing account-specific is written in Git. |
+| One Application per namespace | Argo CD ApplicationSets (cluster generator) | Create one Application per namespace (`argocd`, `kyverno`, `platform`, `sample-web-app`) and fill in each cluster's own values from its annotations, which Terraform sets: ECR registry, Signer profile ARN, cluster name, VPC ID. Nothing account-specific is written in Git. |
 | Admission policies | Kyverno + `kyverno-notation-aws` | Kyverno checks every pod before it runs. Its AWS Signer extension verifies the image's signature; other Kyverno policies enforce pod security. |
 | Load balancing | AWS Load Balancer Controller | Creates an Application Load Balancer from the app's Ingress and sends traffic straight to the pod IPs. |
 | Metrics | metrics-server | Pod CPU and memory, used by the HorizontalPodAutoscaler. |
@@ -108,7 +108,7 @@ code.
 
 | Repository | Holds | Owned by (in a company) | Read by |
 |---|---|---|---|
-| `items-api` | App code, Dockerfile, tests, the CI and release workflows | The app team | GitHub Actions |
+| `sample-web-app` | App code, Dockerfile, tests, the CI and release workflows | The app team | GitHub Actions |
 | `eks-platform-gitops` | Argo CD objects and Kubernetes manifests: platform add-ons, policies, and the app's overlay per environment | The platform team; app teams change their own overlays by pull request | Argo CD (read only) |
 | `cloud-infra-labs` (this repository) | This design, the lab guide, and the Terraform for the AWS side | The platform team; stands in for an infrastructure repository | You, with `terraform apply` |
 
@@ -116,7 +116,7 @@ The app repository (the GitOps repository's layout is in
 [Kubernetes platform design](#kubernetes-platform-design)):
 
 ```
-items-api/
+sample-web-app/
 ├── .github/workflows/
 │   ├── ci.yml              push to main: test, build, push to ECR candidate (scanned)
 │   └── release.yml         tag v*: check the scan, copy to ECR release (signed),
@@ -162,7 +162,7 @@ syncs, shows its health, and rolls back on its own.
 | `argocd` | Argo CD | `argocd` (`argocd/`). Terraform installs Argo CD once; after that, Argo CD upgrades itself from the GitOps repository | — |
 | `kyverno` | Kyverno, the AWS Signer extension, and the policies | `kyverno` (`kyverno/`) | ECR registry and Signer profile ARN, which the signature policy trusts |
 | `platform` | AWS Load Balancer Controller, metrics-server | `platform` (`platform/`, two Helm charts) | Cluster name, VPC ID, region |
-| `app-dev` | The app | `items-api` (`items-api/overlays/dev`) | ECR registry |
+| `app-dev` | The app | `sample-web-app` (`sample-web-app/overlays/dev`) | ECR registry |
 
 **GitOps repository layout** (`eks-platform-gitops`): the Argo CD objects (*which* manifests go
 *where*) are kept apart from the manifests themselves (*what* is deployed).
@@ -175,13 +175,13 @@ eks-platform-gitops/
 ├── apps/                          Argo CD objects only
 │   ├── projects.yaml              AppProjects: platform, workloads (what each may deploy, where)
 │   ├── platform.yaml              ApplicationSet → Applications argocd, kyverno, platform
-│   └── workloads.yaml             ApplicationSet → Application items-api (namespace app-<env>)
+│   └── workloads.yaml             ApplicationSet → Application sample-web-app (namespace app-<env>)
 └── manifests/                     what is deployed: plain Kubernetes YAML and Helm values
     ├── argocd/                    Argo CD's own Helm values
     ├── kyverno/                   Kyverno + kyverno-notation-aws (Helm values)
     │   └── policies/              verify-signature, pod-security, disallow-latest
     ├── platform/                  AWS Load Balancer Controller, metrics-server (Helm values)
-    └── items-api/
+    └── sample-web-app/
         ├── base/                  Deployment, Service, Ingress, HPA, PDB, NetworkPolicy
         └── overlays/{dev,stg,prd}/  version + digest, replicas, quota, limits per environment
 ```
@@ -196,11 +196,11 @@ The app's manifests are plain YAML (Kustomize). An overlay holds only what diffe
 environment; a release changes just the version and digest:
 
 ```yaml
-# manifests/items-api/overlays/dev/kustomization.yaml
+# manifests/sample-web-app/overlays/dev/kustomization.yaml
 resources:
   - ../../base
 images:
-  - name: items-api
+  - name: sample-web-app
     newTag: "1.2.0"
     digest: sha256:…        # written by the release workflow
 ```
@@ -231,8 +231,8 @@ each in its own account.
 
 | Event | What happens | Deployed? |
 |---|---|---|
-| Push to `main` in `items-api` | Test, build, push to `candidate` as `<commit-id>`, Inspector scans it | **No** |
-| Push a version tag in `items-api`, e.g. `v1.2.0` | The release workflow checks that commit's scan, copies the image to `release` as `1.2.0` (ECR signs it), creates a GitHub Release, and opens a pull request in `eks-platform-gitops` setting `1.2.0` + digest in `overlays/dev`, which merges automatically | **Yes, to dev** (Argo CD) |
+| Push to `main` in `sample-web-app` | Test, build, push to `candidate` as `<commit-id>`, Inspector scans it | **No** |
+| Push a version tag in `sample-web-app`, e.g. `v1.2.0` | The release workflow checks that commit's scan, copies the image to `release` as `1.2.0` (ECR signs it), creates a GitHub Release, and opens a pull request in `eks-platform-gitops` setting `1.2.0` + digest in `overlays/dev`, which merges automatically | **Yes, to dev** (Argo CD) |
 | Pull request in `eks-platform-gitops` setting `1.2.0` in `overlays/stg` or `overlays/prd`, approved by a code owner and merged | Argo CD in that environment's cluster deploys the same signed digest | **Yes, to stg / prd** (the lab deploys only dev) |
 | Pull request in `eks-platform-gitops` setting the previous version back, merged | Argo CD deploys the previous signed digest | **Yes: rollback** |
 
@@ -250,7 +250,7 @@ Numbered to match the arrows in the diagram.
 
 **Build and scan (CI, every push to `main`)**
 
-1. The developer pushes a change to `main` in the `items-api` repository.
+1. The developer pushes a change to `main` in the `sample-web-app` repository.
 2. The CI workflow tests the app, builds the image, and gets short-lived AWS credentials through
    OIDC.
 3. It pushes the image to the **`candidate`** repository, tagged with the commit ID. Amazon
@@ -258,19 +258,19 @@ Numbered to match the arrows in the diagram.
 
 **Release (a version tag)**
 
-4. The developer pushes a version tag in `items-api`, e.g. `v1.2.0`, on a commit of `main`.
+4. The developer pushes a version tag in `sample-web-app`, e.g. `v1.2.0`, on a commit of `main`.
 5. The release workflow checks that commit's scan result. If there is any **critical** finding,
    it stops: the image never reaches `release`, so it can never be deployed.
 6. If the scan is clean, it copies the **same image (same digest)** to the **`release`**
    repository as `1.2.0`. ECR managed signing signs it with AWS Signer as it is pushed. The
    workflow creates a GitHub Release and, with a one-hour token from the GitHub App, opens a pull
    request in `eks-platform-gitops` that sets `1.2.0` and the digest in
-   `manifests/items-api/overlays/dev`; it merges automatically.
+   `manifests/sample-web-app/overlays/dev`; it merges automatically.
 
 **Deploy (GitOps)**
 
 7. Argo CD, running in the cluster, watches `eks-platform-gitops` and sees the merged change: the
-   `items-api` Application (namespace `app-dev`) syncs the new version, with the registry address
+   `sample-web-app` Application (namespace `app-dev`) syncs the new version, with the registry address
    from the cluster's annotations.
 8. Before each new pod starts, the Kubernetes API server asks Kyverno. Kyverno checks the
    signature through AWS Signer and checks the pod-security rules; an unsigned image, or one from
@@ -292,7 +292,7 @@ Numbered to match the arrows in the diagram.
 | Kubernetes | Self-managed (kubeadm on EC2) · ROSA · EKS | **EKS** | Managed control plane across AZs; native IAM and VPC integration; the most common choice on AWS |
 | Nodes | Managed node group · Karpenter · Fargate | **Managed node group** | Simple and predictable for 2 nodes; AWS handles the AMI and node replacement. Karpenter pays off with many workloads and node types (an improvement below). Fargate can't run every add-on and costs more per pod |
 | Deploy model | CI pushes with `kubectl` · GitOps pull (Argo CD) | **GitOps with Argo CD** | Git is the single source of truth; the CI pipeline never holds cluster credentials; drift is corrected and every change can be reverted in Git |
-| Repositories | One repository for everything · **app, GitOps, and infrastructure in separate repositories** | **Separate**: `items-api`, `eks-platform-gitops`, and Terraform in this lab | As in most companies: each team owns its repository and its permissions; deployment changes are reviewed apart from code; Argo CD reads only configuration, never the app code; the app's tags are its own versions |
+| Repositories | One repository for everything · **app, GitOps, and infrastructure in separate repositories** | **Separate**: `sample-web-app`, `eks-platform-gitops`, and Terraform in this lab | As in most companies: each team owns its repository and its permissions; deployment changes are reviewed apart from code; Argo CD reads only configuration, never the app code; the app's tags are its own versions |
 | Version change in the GitOps repository | Argo CD Image Updater · a manual "promote" workflow · **a pull request from the release workflow (GitHub App)** | **Pull request through a GitHub App** | Every deployment is a reviewed, revertible commit, with no extra controller holding Git write access in the cluster; the App's token lasts one hour and works only on the GitOps repository. Trade-off: the App's private key is stored as a GitHub secret |
 | Add-on installation | Terraform Helm releases · Argo CD from Git | **Argo CD from Git** (Terraform installs only Argo CD, which then manages its own upgrades) | Add-ons are versioned and reviewed like the app; Terraform stays focused on AWS resources |
 | Argo CD Applications | One per cluster (everything in one) · **one per namespace** | **One per namespace** | Each part syncs, shows its health, and rolls back on its own, so a broken policy change doesn't block an app release; AppProjects limit each Application to its own namespaces |
@@ -316,13 +316,13 @@ Numbered to match the arrows in the diagram.
 ## Security
 
 - **No long-lived cloud credentials.** GitHub Actions gets short-lived AWS credentials through
-  OIDC, with one IAM role per workflow, trusted only for the `items-api` repository: the CI role
+  OIDC, with one IAM role per workflow, trusted only for the `sample-web-app` repository: the CI role
   (only on `main`) can push to `candidate`; the release role (only on `v*` tags) can read
   `candidate` and its scan findings, push to `release`, and use the Signer profile. Neither gets
   Kubernetes credentials.
 - **Access between repositories:** a GitHub App installed only on `eks-platform-gitops`, allowed
   to push branches and open pull requests; its tokens last one hour. Its private key is the only
-  stored secret (a GitHub Actions secret in `items-api`) and can be rotated in the App's settings.
+  stored secret (a GitHub Actions secret in `sample-web-app`) and can be rotated in the App's settings.
   `CODEOWNERS` makes every change except dev's version wait for a reviewer. Argo CD only reads the
   GitOps repository (public in the lab; through a read-only deploy key in production).
 - **Pods get only what they need through EKS Pod Identity:** the app can read and write its one
@@ -334,7 +334,7 @@ Numbered to match the arrows in the diagram.
 - **Private nodes and a restricted API.** Nodes have no public IPs. The public API endpoint
   accepts only the admin's IP; cluster access is granted through EKS access entries.
 - **Inside the cluster:** default-deny NetworkPolicies, non-root pods with read-only root file
-  systems, quotas per namespace, and RBAC per namespace. Argo CD AppProjects let the `items-api`
+  systems, quotas per namespace, and RBAC per namespace. Argo CD AppProjects let the `sample-web-app`
   Application deploy only into `app-*` namespaces and create no cluster-wide objects.
 - **Encryption:** Kubernetes secrets with a KMS key; DynamoDB, ECR, and EBS volumes encrypted at
   rest.
@@ -356,7 +356,7 @@ Numbered to match the arrows in the diagram.
 | The NAT gateway's AZ fails | Running pods keep serving and DynamoDB still works (gateway endpoint), but Argo CD can't reach GitHub and new images can't be pulled | Wait for the AZ, or (production) one NAT per AZ |
 | A bad release passes the scan and the health checks | Users get the broken version | Set the previous version back in the overlay (pull request); Argo CD deploys its signed digest |
 | Someone changes the cluster by hand | Drift from Git | Argo CD self-heal puts it back |
-| A broken platform change (for example a bad Kyverno policy) | Only that namespace's Application shows Degraded; the `items-api` Application keeps its own sync and health | Revert the change in Git |
+| A broken platform change (for example a bad Kyverno policy) | Only that namespace's Application shows Degraded; the `sample-web-app` Application keeps its own sync and health | Revert the change in Git |
 | The GitHub App's private key leaks | Someone can open pull requests in `eks-platform-gitops`, but only dev's version merges without review, and Kyverno still rejects any image we didn't sign | Revoke the key in the App's settings and create a new one |
 | EKS version upgrade | Nodes must be replaced | Upgrade the control plane, then roll the node group (one node at a time; the PDB keeps the app up) |
 
