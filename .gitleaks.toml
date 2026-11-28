@@ -1,0 +1,21 @@
+# gitleaks rules for this repo: the built-in secret rules (keys, passwords, tokens), plus a rule
+# for AWS account IDs. Used by the local pre-commit hook and by .github/workflows/gitleaks.yml.
+
+title = "cloud-infra-labs"
+
+[extend]
+useDefault = true
+
+# An account ID isn't a credential, so the built-in rules ignore it. This repo is public and
+# keeps no account IDs in files (Terraform reads the ID from the AWS login), so flag any
+# 12-digit ID in the places it usually leaks: ARNs, ECR addresses, account_id settings,
+# and S3 bucket names that end with <account-id>-<region>.
+[[rules]]
+id = "aws-account-id"
+description = "AWS account ID in an ARN, ECR address, account_id setting, or S3 bucket name"
+regex = '''(?i)(?:arn:aws[a-z-]*:[a-z0-9-]*:[a-z0-9-]*:\d{12}:|\b\d{12}\.dkr\.ecr\.|account[_-]?id["'\s]*[:=]\s*["']?\d{12}\b|-\d{12}-(?:us|eu|ap|ca|sa|me|af|il|mx)-[a-z]+-\d)'''
+
+# AWS's own example account IDs, used in documentation, are not real accounts.
+[allowlist]
+description = "AWS documentation example account IDs"
+regexes = ['''123456789012''', '''111122223333''', '''444455556666''']

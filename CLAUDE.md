@@ -14,6 +14,9 @@ something the owner actually designed, built, and ran.
 - **Never commit secrets.** No access keys, tokens, passwords, private keys, kubeconfigs,
   or `.env` files. Use placeholders (`<your-account-id>`) and tell the human where to set
   the real value. The `gitleaks` workflow scans every push; never weaken or skip it.
+- **No AWS account IDs in files.** Read the ID at run time (Terraform: `data.aws_caller_identity`;
+  CLI: `aws sts get-caller-identity`) or use a placeholder. `.gitleaks.toml` has a rule for this,
+  and the local pre-commit hook runs it before every commit.
 - **Never commit Terraform state** (`*.tfstate*`) or `.terraform/`. State files can contain
   private keys in plain text. `.gitignore` blocks them; keep it that way.
 - **No client or employer information.** The owner's day job involves confidential client
