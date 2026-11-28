@@ -4,8 +4,9 @@
 > builds and scans every change, a version tag (`v1.2.0`) releases an image only if Amazon
 > Inspector found no critical vulnerabilities, Amazon ECR signs it with AWS Signer, Argo CD
 > deploys it from Kustomize manifests in a GitOps repository, and Kyverno lets the cluster run
-> only signed images. A small REST API stores its data in DynamoDB. As in a company, the app code,
-> the GitOps configuration, and the infrastructure (Terraform) live in separate repositories.
+> only signed images. A small web app (a page plus the REST API behind it) stores its data in
+> DynamoDB. As in a company, the app code, the GitOps configuration, and the infrastructure
+> (Terraform) live in separate repositories.
 
 **Related lab:** Lab 01 (kubernetes) — GitOps Platform on EKS with Image Scanning and Signing
 *(built after this design is reviewed)*
@@ -13,9 +14,10 @@
 ## Requirements
 
 - **Functional**
-  - Users store items and later retrieve or update them through a small REST API (create, list,
-    get, update) at the load balancer's address. The data lives in DynamoDB and survives pod
-    restarts and deployments.
+  - Users store items and later retrieve or update them at the load balancer's address, through
+    a **web page** (a table of the items, with add and edit) or the **REST API** behind it
+    (create, list, get, update). The page shows the running version. The data lives in DynamoDB
+    and survives pod restarts and deployments.
   - A push to `main` in the app repository (`sample-web-app`) tests the app, builds an image, and
     scans it. **It deploys nothing.**
   - **A version tag releases:** pushing a tag such as `v1.2.0` in `sample-web-app` turns that
@@ -95,7 +97,7 @@ Both are pages of [diagram.drawio](./diagram.drawio). The numbers match
 | Admission policies | Kyverno + `kyverno-notation-aws` | Kyverno checks every pod before it runs. Its AWS Signer extension verifies the image's signature; other Kyverno policies enforce pod security. |
 | Load balancing | AWS Load Balancer Controller | Creates an Application Load Balancer from the app's Ingress and sends traffic straight to the pod IPs. |
 | Metrics | metrics-server | Pod CPU and memory, used by the HorizontalPodAutoscaler. |
-| App | A small REST API (container) | `POST/GET /items`, `GET/PUT /items/{id}`, `/healthz`. Stores items in DynamoDB. |
+| App | `sample-web-app` (container) | A web page at `/` (a table of the items, with add and edit, and the running version) and the REST API it calls: `POST/GET /items`, `GET/PUT /items/{id}`, `/info` (name and version), `/healthz`. Stores items in DynamoDB. |
 | Database | Amazon DynamoDB | One on-demand table for the items. No servers, encrypted at rest, point-in-time recovery. |
 | Infrastructure as code | Terraform (in this lab's folder of `cloud-infra-labs`) | Creates the AWS side (VPC, EKS, node group, ECR, Signer profile, IAM, DynamoDB), installs Argo CD once, and registers the cluster in Argo CD with its environment label and per-cluster annotations; Argo CD then manages itself and everything else from the GitOps repository. |
 
@@ -122,7 +124,7 @@ sample-web-app/
 │   └── release.yml         tag v*: check the scan, copy to ECR release (signed),
 │                           GitHub Release, pull request to eks-platform-gitops
 ├── Dockerfile
-└── src/                    REST API + tests
+└── src/                    web page, REST API, tests
 ```
 
 **How a release reaches the GitOps repository:** the release workflow gets a token from a GitHub
@@ -146,7 +148,7 @@ version; stg and prd always wait for a review.
 | Kubernetes version | The current EKS standard-support version, pinned in Terraform |
 | Cluster API access | Private endpoint for the nodes; public endpoint limited to the admin's IP address. The CI pipeline never calls the API: it only writes to Git. |
 | Internet access | Inbound HTTP :80 to the load balancer only. Outbound from the nodes through the NAT gateway. |
-| App URL | `http://<load-balancer-dns-name>/` |
+| App URL | `http://<load-balancer-dns-name>/` (the web page; the API is under `/items`) |
 | Terraform state | S3 bucket with native state locking; no account ID in any file (read from the AWS login, as in Architecture 02) |
 
 ## Kubernetes platform design
@@ -280,8 +282,9 @@ Numbered to match the arrows in the diagram.
 
 **User request**
 
-10. A user opens `http://<load-balancer-dns-name>/`; the Application Load Balancer (created by the
-    AWS Load Balancer Controller from the Ingress) sends the request to a ready pod in either AZ.
+10. A user opens `http://<load-balancer-dns-name>/` in a browser (or calls the API); the
+    Application Load Balancer (created by the AWS Load Balancer Controller from the Ingress) sends
+    the request to a ready pod in either AZ. The page itself calls the same REST API.
 11. The pod reads or writes the item in DynamoDB through the gateway endpoint, with credentials
     from EKS Pod Identity.
 
@@ -305,6 +308,7 @@ Numbered to match the arrows in the diagram.
 | What a signature means | Sign every build · **sign only after the scan passes** | **Two repositories: `candidate` (scanned) → `release` (signed)** | Managed signing signs at push time, before a scan can finish. Signing only the `release` repository makes "signed" also mean "passed the scan", so the cluster check covers both |
 | Signature check in the cluster | Kyverno + `kyverno-notation-aws` · Ratify + OPA Gatekeeper | **Kyverno** | Both are supported by AWS for Signer. Kyverno policies are plain Kubernetes YAML, and the same tool also enforces pod security; CNCF Graduated |
 | Pod access to AWS | Node IAM role · IRSA · **EKS Pod Identity** | **Pod Identity** | One IAM role per service account, set up without an OIDC provider per cluster; the newer AWS-recommended way |
+| Web page | Separate frontend (S3 + CloudFront) · **one static page served by the app** | **Served by the app** | One image to scan, sign, and deploy, so the page gets the same release, signing, and rollback as the API; it calls the same REST API as `curl`; no extra AWS service (as in Architecture 02) |
 | Database | RDS / Aurora · **DynamoDB** | **DynamoDB (on demand)** | No servers or passwords: access is an IAM role through Pod Identity; pennies at lab scale; multi-AZ by design |
 | Outbound internet | NAT per AZ · **1 NAT** · VPC endpoints only | **1 NAT + free gateway endpoints (S3, DynamoDB)** | Argo CD must reach GitHub, so some internet access is needed. One NAT halves the cost for a lab; production uses one per AZ |
 | Load balancing | Service type LoadBalancer (NLB) · **Ingress + AWS Load Balancer Controller (ALB)** | **ALB via Ingress** | HTTP routing and health checks per path; targets are pod IPs, so traffic skips extra node hops |
